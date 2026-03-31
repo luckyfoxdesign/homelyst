@@ -1,0 +1,31 @@
+---
+import { getShops } from '../lib/db';
+import Layout from '../layouts/Layout.astro';
+
+const shops = getShops();
+---
+
+<Layout title="Shoper — Все магазины">
+  <main class="max-w-4xl mx-auto px-4 py-12">
+    <h1 class="text-3xl font-bold text-gray-900 mb-8">Магазины</h1>
+
+    {shops.length === 0 ? (
+      <div class="text-center py-16 text-gray-500">
+        <p class="text-lg">Нет доступных магазинов</p>
+        <a href="/admin/login" class="mt-4 inline-block text-indigo-600 hover:underline">Войти в панель администратора</a>
+      </div>
+    ) : (
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {shops.map((shop) => (
+          <a
+            href={`/shop/${shop.id}`}
+            class="bg-white rounded-2xl shadow-sm hover:shadow-md transition-shadow p-6 flex flex-col gap-2"
+          >
+            <h2 class="text-xl font-semibold text-gray-900">{shop.name}</h2>
+            <span class="text-sm text-indigo-600 font-medium">{shop.id}</span>
+          </a>
+        ))}
+      </div>
+    )}
+  </main>
+</Layout>

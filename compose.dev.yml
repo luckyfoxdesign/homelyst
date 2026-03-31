@@ -1,0 +1,11 @@
+services:
+  app:
+    command: npm run dev
+    ports:
+      - "4321:4321"
+    volumes:
+      - db_data:/app/data
+      - ./src:/app/src
+      - ./public:/app/public
+      - ./astro.config.mjs:/app/astro.config.mjs
+      - ./tailwind.config.mjs:/app/tailwind.config.mjs

@@ -1,0 +1,84 @@
+---
+import { getShops } from '../../lib/db';
+import Layout from '../../layouts/Layout.astro';
+
+const shops = getShops();
+let createError = '';
+---
+
+<Layout title="Панель администратора">
+  <main class="max-w-4xl mx-auto px-4 py-8">
+    <div class="flex items-center justify-between mb-8">
+      <h1 class="text-3xl font-bold text-gray-900">Панель администратора</h1>
+      <form method="POST" action="/api/auth/logout">
+        <button
+          type="submit"
+          class="text-sm text-gray-500 hover:text-gray-700 border border-gray-300 hover:bg-gray-50 rounded-lg px-4 py-2 min-h-10 transition-colors"
+        >
+          Выйти
+        </button>
+      </form>
+    </div>
+
+    <!-- Shops List -->
+    <section class="mb-10">
+      <h2 class="text-xl font-semibold text-gray-800 mb-4">Магазины</h2>
+      {shops.length === 0 ? (
+        <p class="text-gray-500 text-sm">Нет созданных магазинов.</p>
+      ) : (
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {shops.map((shop) => (
+            <a
+              href={`/admin/${shop.id}`}
+              class="bg-white rounded-2xl shadow-sm hover:shadow-md transition-shadow p-5 flex flex-col gap-1"
+            >
+              <span class="font-semibold text-gray-900">{shop.name}</span>
+              <span class="text-xs text-gray-400">{shop.id}</span>
+            </a>
+          ))}
+        </div>
+      )}
+    </section>
+
+    <!-- Create Shop -->
+    <section class="bg-white rounded-2xl shadow-sm p-6">
+      <h2 class="text-xl font-semibold text-gray-800 mb-4">Создать магазин</h2>
+
+      <form method="POST" action="/api/shops" class="space-y-4" id="create-shop-form">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1" for="shop-id">
+            ID магазина (slug, латинские буквы и цифры)
+          </label>
+          <input
+            type="text"
+            id="shop-id"
+            name="id"
+            required
+            pattern="[a-z0-9\-]+"
+            placeholder="my-shop"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+          />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1" for="shop-name">
+            Название магазина
+          </label>
+          <input
+            type="text"
+            id="shop-name"
+            name="name"
+            required
+            placeholder="Мой магазин"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+          />
+        </div>
+        <button
+          type="submit"
+          class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg px-4 py-2 min-h-10 text-sm transition-colors"
+        >
+          Создать магазин
+        </button>
+      </form>
+    </section>
+  </main>
+</Layout>

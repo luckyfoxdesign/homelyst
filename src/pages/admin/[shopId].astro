@@ -1,0 +1,313 @@
+---
+import { getShop, getProducts, getProductImages } from '../../lib/db';
+import Layout from '../../layouts/Layout.astro';
+
+const { shopId } = Astro.params;
+
+if (!shopId) {
+  return new Response(null, { status: 404 });
+}
+
+const shop = getShop(shopId);
+if (!shop) {
+  return new Response(null, { status: 404 });
+}
+
+const products = getProducts(shopId);
+const productsWithImages = products.map((p) => ({
+  ...p,
+  images: getProductImages(p.id),
+}));
+---
+
+<Layout title={`Управление — ${shop.name}`}>
+  <main class="max-w-5xl mx-auto px-4 py-8">
+    <div class="flex items-center justify-between mb-8 gap-4 flex-wrap">
+      <div>
+        <a href="/admin" class="text-sm text-indigo-600 hover:underline mb-1 block">← Все магазины</a>
+        <h1 class="text-3xl font-bold text-gray-900">{shop.name}</h1>
+        <a href={`/shop/${shop.id}`} target="_blank" class="text-sm text-gray-500 hover:underline mt-1 block">
+          Открыть магазин ↗
+        </a>
+      </div>
+      <form method="POST" action="/api/auth/logout">
+        <button
+          type="submit"
+          class="text-sm text-gray-500 hover:text-gray-700 border border-gray-300 hover:bg-gray-50 rounded-lg px-4 py-2 min-h-10 transition-colors"
+        >
+          Выйти
+        </button>
+      </form>
+    </div>
+
+    <!-- Add Product Section -->
+    <section class="bg-white rounded-2xl shadow-sm p-6 mb-8">
+      <h2 class="text-xl font-semibold text-gray-800 mb-4">Добавить товар</h2>
+
+      <form
+        id="add-product-form"
+        class="space-y-4"
+        enctype="multipart/form-data"
+      >
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1" for="title">
+              Название <span class="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              id="title"
+              name="title"
+              required
+              placeholder="Название товара"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1" for="price">
+              Цена (€)
+            </label>
+            <input
+              type="number"
+              id="price"
+              name="price"
+              min="0"
+              step="0.01"
+              value="0"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1" for="size">
+            Размер (необязательно)
+          </label>
+          <input
+            type="text"
+            id="size"
+            name="size"
+            placeholder="80, XS, 42..."
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+          />
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1" for="description">
+            Описание (необязательно)
+          </label>
+          <textarea
+            id="description"
+            name="description"
+            rows="3"
+            placeholder="Описание товара..."
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
+          ></textarea>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1" for="images">
+            Фотографии (необязательно)
+          </label>
+          <input
+            type="file"
+            id="images"
+            name="images"
+            multiple
+            accept="image/*"
+            class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+          />
+        </div>
+
+        <div id="add-product-error" class="hidden text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2"></div>
+
+        <button
+          type="submit"
+          id="add-product-btn"
+          class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg px-4 py-2 min-h-10 text-sm transition-colors"
+        >
+          Добавить товар
+        </button>
+      </form>
+    </section>
+
+    <!-- Products List -->
+    <section>
+      <h2 class="text-xl font-semibold text-gray-800 mb-4">
+        Товары ({productsWithImages.length})
+      </h2>
+
+      {productsWithImages.length === 0 ? (
+        <div class="bg-white rounded-2xl shadow-sm p-8 text-center text-gray-400">
+          <p>Нет товаров. Добавьте первый товар выше.</p>
+        </div>
+      ) : (
+        <div class="space-y-3">
+          {productsWithImages.map((product) => (
+            <div class="bg-white rounded-2xl shadow-sm p-4 flex gap-4 items-start flex-wrap sm:flex-nowrap">
+              <!-- Thumbnail -->
+              <div class="w-16 h-16 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
+                {product.images.length > 0 ? (
+                  <img
+                    src={`/api/uploads/${shopId}/${product.id}/${product.images[0].filename}`}
+                    alt={product.title}
+                    class="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div class="w-full h-full flex items-center justify-center">
+                    <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                )}
+              </div>
+
+              <!-- Info -->
+              <div class="flex-1 min-w-0">
+                <p class="font-medium text-gray-900 truncate">{product.title}</p>
+                <p class="text-sm text-gray-500">
+                  {product.price === 0 ? 'Бесплатно' : `${product.price}€`}
+                  {product.size ? ` · ${product.size}` : ''}
+                </p>
+                <div class="mt-1">
+                  {product.status === 'available' && (
+                    <span class="bg-green-100 text-green-800 text-xs px-2 py-0.5 rounded-full font-medium">Доступно</span>
+                  )}
+                  {product.status === 'reserved' && (
+                    <span class="bg-amber-100 text-amber-800 text-xs px-2 py-0.5 rounded-full font-medium">
+                      Забронировано: {product.reserved_by}
+                      {product.confirmed ? ' (подтверждено)' : ' (ожидает)'}
+                    </span>
+                  )}
+                  {product.status === 'sold' && (
+                    <span class="bg-gray-100 text-gray-500 text-xs px-2 py-0.5 rounded-full font-medium">Продано</span>
+                  )}
+                </div>
+              </div>
+
+              <!-- Actions -->
+              <div class="flex gap-2 flex-wrap flex-shrink-0">
+                {product.status === 'reserved' && !product.confirmed && (
+                  <button
+                    type="button"
+                    class="action-btn bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded-lg px-3 py-2 min-h-9 transition-colors"
+                    data-action="confirm"
+                    data-product-id={product.id}
+                    data-shop-id={shopId}
+                  >
+                    Подтвердить
+                  </button>
+                )}
+                {product.status === 'reserved' && (
+                  <button
+                    type="button"
+                    class="action-btn border border-amber-300 hover:bg-amber-50 text-amber-700 text-xs font-medium rounded-lg px-3 py-2 min-h-9 transition-colors"
+                    data-action="release"
+                    data-product-id={product.id}
+                    data-shop-id={shopId}
+                  >
+                    Снять бронь
+                  </button>
+                )}
+                <button
+                  type="button"
+                  class="action-btn border border-red-300 hover:bg-red-50 text-red-600 text-xs font-medium rounded-lg px-3 py-2 min-h-9 transition-colors"
+                  data-action="delete"
+                  data-product-id={product.id}
+                  data-shop-id={shopId}
+                >
+                  Удалить
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  </main>
+</Layout>
+
+<script is:inline>
+(function () {
+  var shopId = window.location.pathname.split('/').pop();
+
+  // Add product form
+  var addForm = document.getElementById('add-product-form');
+  if (addForm) {
+    addForm.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var btn = document.getElementById('add-product-btn');
+      var errorEl = document.getElementById('add-product-error');
+      btn.disabled = true;
+      btn.textContent = 'Добавляю...';
+      errorEl.classList.add('hidden');
+
+      var formData = new FormData(addForm);
+
+      fetch('/api/shops/' + shopId + '/products', {
+        method: 'POST',
+        body: formData,
+      })
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+          if (data.success) {
+            window.location.reload();
+          } else {
+            errorEl.textContent = data.error || 'Произошла ошибка';
+            errorEl.classList.remove('hidden');
+            btn.disabled = false;
+            btn.textContent = 'Добавить товар';
+          }
+        })
+        .catch(function () {
+          errorEl.textContent = 'Произошла ошибка при отправке.';
+          errorEl.classList.remove('hidden');
+          btn.disabled = false;
+          btn.textContent = 'Добавить товар';
+        });
+    });
+  }
+
+  // Action buttons (confirm, release, delete)
+  document.querySelectorAll('.action-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var action = btn.getAttribute('data-action');
+      var productId = btn.getAttribute('data-product-id');
+      var shopIdAttr = btn.getAttribute('data-shop-id');
+
+      if (action === 'delete') {
+        if (!confirm('Удалить этот товар? Действие необратимо.')) return;
+      }
+
+      var url, method;
+      if (action === 'delete') {
+        url = '/api/shops/' + shopIdAttr + '/products/' + productId;
+        method = 'DELETE';
+      } else if (action === 'confirm') {
+        url = '/api/shops/' + shopIdAttr + '/products/' + productId + '/confirm';
+        method = 'POST';
+      } else if (action === 'release') {
+        url = '/api/shops/' + shopIdAttr + '/products/' + productId + '/release';
+        method = 'POST';
+      }
+
+      btn.disabled = true;
+
+      fetch(url, { method: method })
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+          if (data.success) {
+            window.location.reload();
+          } else {
+            alert(data.error || 'Произошла ошибка');
+            btn.disabled = false;
+          }
+        })
+        .catch(function () {
+          alert('Произошла ошибка');
+          btn.disabled = false;
+        });
+    });
+  });
+})();
+</script>

@@ -1,0 +1,358 @@
+---
+import type { Product, ProductImage } from '../lib/db';
+
+export interface Props {
+  product: Product & { images: ProductImage[] };
+  shopId: string;
+}
+
+const { product, shopId } = Astro.props;
+const { images } = product;
+
+const priceLabel = product.price === 0 ? 'Бесплатно' : `${product.price}€`;
+
+let statusBadge = '';
+let statusClass = '';
+if (product.status === 'available') {
+  statusBadge = '';
+  statusClass = '';
+} else if (product.status === 'reserved') {
+  statusBadge = 'Забронировано';
+  statusClass = 'bg-amber-100 text-amber-800';
+} else {
+  statusBadge = 'Продано';
+  statusClass = 'bg-gray-100 text-gray-500';
+}
+
+const cardId = `card-${product.id}`;
+const galleryId = `gallery-${product.id}`;
+const modalId = `modal-${product.id}`;
+---
+
+<div class="bg-white rounded-2xl shadow-sm hover:shadow-md transition-shadow overflow-hidden flex flex-col" id={cardId}>
+  <!-- Image Gallery -->
+  <div class="aspect-square overflow-hidden rounded-t-2xl relative bg-gray-100" id={galleryId}>
+    {images.length === 0 ? (
+      <div class="w-full h-full flex items-center justify-center bg-gray-200">
+        <svg class="w-16 h-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        </svg>
+      </div>
+    ) : (
+      <>
+        {images.map((img, idx) => (
+          <img
+            src={`/api/uploads/${shopId}/${product.id}/${img.filename}`}
+            alt={`${product.title} - фото ${idx + 1}`}
+            class={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 gallery-slide`}
+            data-gallery={product.id}
+            data-index={idx}
+            style={idx === 0 ? 'opacity:1;' : 'opacity:0;pointer-events:none;'}
+            loading="lazy"
+          />
+        ))}
+
+        {images.length > 1 && (
+          <>
+            <!-- Prev button -->
+            <button
+              type="button"
+              class="gallery-prev absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-white/80 hover:bg-white rounded-full w-8 h-8 flex items-center justify-center shadow transition-colors"
+              data-gallery={product.id}
+              data-count={images.length}
+              aria-label="Предыдущее фото"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+
+            <!-- Next button -->
+            <button
+              type="button"
+              class="gallery-next absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-white/80 hover:bg-white rounded-full w-8 h-8 flex items-center justify-center shadow transition-colors"
+              data-gallery={product.id}
+              data-count={images.length}
+              aria-label="Следующее фото"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+
+            <!-- Dot indicators -->
+            <div class="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1 z-10">
+              {images.map((_, idx) => (
+                <button
+                  type="button"
+                  class={`gallery-dot w-2 h-2 rounded-full transition-colors ${idx === 0 ? 'bg-white' : 'bg-white/50'}`}
+                  data-gallery={product.id}
+                  data-index={idx}
+                  aria-label={`Фото ${idx + 1}`}
+                />
+              ))}
+            </div>
+          </>
+        )}
+      </>
+    )}
+  </div>
+
+  <!-- Product Info -->
+  <div class="p-4 flex flex-col gap-2 flex-1">
+    <h3 class="font-semibold text-gray-900 leading-tight">{product.title}</h3>
+
+    <div class="flex items-center gap-2 flex-wrap">
+      <span class="text-lg font-bold text-gray-900">{priceLabel}</span>
+      {product.size && (
+        <span class="bg-blue-50 text-blue-700 text-xs px-2 py-0.5 rounded-full font-medium">{product.size}</span>
+      )}
+    </div>
+
+    {product.description && (
+      <p class="text-sm text-gray-600 leading-relaxed">{product.description}</p>
+    )}
+
+    <div class="mt-auto pt-2 flex items-center justify-between gap-2">
+      {statusBadge && (
+        <span
+          class={`text-xs px-2 py-0.5 rounded-full font-medium ${statusClass}`}
+          data-reserved-badge={product.status === 'reserved' ? product.id : undefined}
+        >
+          {statusBadge}
+        </span>
+      )}
+
+      {product.status === 'available' && (
+        <button
+          type="button"
+          class="reserve-btn bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg px-4 py-2 min-h-10 transition-colors"
+          data-product-id={product.id}
+          data-shop-id={shopId}
+          data-modal={modalId}
+        >
+          Забронировать
+        </button>
+      )}
+    </div>
+  </div>
+</div>
+
+<!-- Reservation Modal -->
+{product.status === 'available' && (
+  <dialog
+    id={modalId}
+    class="rounded-2xl shadow-2xl p-0 backdrop:bg-black/50 w-full max-w-sm mx-auto"
+  >
+    <div class="p-6">
+      <h2 class="text-xl font-semibold text-gray-900 mb-4">Забронировать товар</h2>
+      <p class="text-sm text-gray-600 mb-4">Введите ваше имя для бронирования. Бронь действует 24 часа.</p>
+
+      <div id={`error-${product.id}`} class="hidden mb-3 text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2"></div>
+
+      <form id={`reserve-form-${product.id}`} class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1" for={`name-${product.id}`}>
+            Ваше имя
+          </label>
+          <input
+            type="text"
+            id={`name-${product.id}`}
+            name="name"
+            required
+            placeholder="Введите имя"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+          />
+        </div>
+
+        <div class="flex gap-3">
+          <button
+            type="submit"
+            class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg px-4 py-2 min-h-10 text-sm transition-colors"
+          >
+            Забронировать
+          </button>
+          <button
+            type="button"
+            class="modal-close flex-1 border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium rounded-lg px-4 py-2 min-h-10 text-sm transition-colors"
+            data-modal={modalId}
+          >
+            Отмена
+          </button>
+        </div>
+      </form>
+    </div>
+  </dialog>
+)}
+
+<script>
+(function () {
+  // Toast notification
+  function showToast(message, type) {
+    var existing = document.getElementById('__toast__');
+    if (existing) existing.remove();
+
+    var toast = document.createElement('div');
+    toast.id = '__toast__';
+    var bg = type === 'error' ? '#ef4444' : '#22c55e';
+    toast.style.cssText = [
+      'position:fixed',
+      'bottom:24px',
+      'left:50%',
+      'transform:translateX(-50%) translateY(20px)',
+      'background:' + bg,
+      'color:#fff',
+      'padding:12px 20px',
+      'border-radius:12px',
+      'font-size:14px',
+      'font-weight:500',
+      'box-shadow:0 4px 16px rgba(0,0,0,0.15)',
+      'z-index:9999',
+      'opacity:0',
+      'transition:opacity 0.25s ease, transform 0.25s ease',
+      'white-space:nowrap',
+      'pointer-events:none'
+    ].join(';');
+    toast.textContent = message;
+    document.body.appendChild(toast);
+
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () {
+        toast.style.opacity = '1';
+        toast.style.transform = 'translateX(-50%) translateY(0)';
+      });
+    });
+
+    setTimeout(function () {
+      toast.style.opacity = '0';
+      toast.style.transform = 'translateX(-50%) translateY(20px)';
+      setTimeout(function () { toast.remove(); }, 300);
+    }, 3000);
+  }
+
+  // Mark reserved-by-me badges on page load
+  document.querySelectorAll('[data-reserved-badge]').forEach(function (el) {
+    var pid = el.getAttribute('data-reserved-badge');
+    if (pid && localStorage.getItem('reserved_' + pid)) {
+      el.textContent = 'Забронировано вами';
+    }
+  });
+
+  // Gallery logic
+  document.querySelectorAll('.gallery-prev, .gallery-next').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var galleryId = btn.getAttribute('data-gallery');
+      var count = parseInt(btn.getAttribute('data-count') || '0', 10);
+      var slides = document.querySelectorAll('[data-gallery="' + galleryId + '"].gallery-slide');
+      var dots = document.querySelectorAll('[data-gallery="' + galleryId + '"].gallery-dot');
+      var currentIndex = 0;
+      for (var i = 0; i < slides.length; i++) {
+        if (slides[i].style.opacity === '1') { currentIndex = i; break; }
+      }
+      var direction = btn.classList.contains('gallery-prev') ? -1 : 1;
+      var nextIndex = (currentIndex + direction + count) % count;
+      for (var j = 0; j < slides.length; j++) {
+        slides[j].style.opacity = j === nextIndex ? '1' : '0';
+        slides[j].style.pointerEvents = j === nextIndex ? '' : 'none';
+      }
+      for (var k = 0; k < dots.length; k++) {
+        dots[k].classList.toggle('bg-white', k === nextIndex);
+        dots[k].classList.toggle('bg-white/50', k !== nextIndex);
+      }
+    });
+  });
+
+  document.querySelectorAll('.gallery-dot').forEach(function (dot) {
+    dot.addEventListener('click', function () {
+      var galleryId = dot.getAttribute('data-gallery');
+      var targetIndex = parseInt(dot.getAttribute('data-index') || '0', 10);
+      var slides = document.querySelectorAll('[data-gallery="' + galleryId + '"].gallery-slide');
+      var dots = document.querySelectorAll('[data-gallery="' + galleryId + '"].gallery-dot');
+      for (var i = 0; i < slides.length; i++) {
+        slides[i].style.opacity = i === targetIndex ? '1' : '0';
+        slides[i].style.pointerEvents = i === targetIndex ? '' : 'none';
+      }
+      for (var k = 0; k < dots.length; k++) {
+        dots[k].classList.toggle('bg-white', k === targetIndex);
+        dots[k].classList.toggle('bg-white/50', k !== targetIndex);
+      }
+    });
+  });
+
+  // Reserve button - open modal
+  document.querySelectorAll('.reserve-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var modalId = btn.getAttribute('data-modal');
+      var modal = document.getElementById(modalId);
+      if (modal) modal.showModal();
+    });
+  });
+
+  // Modal close button
+  document.querySelectorAll('.modal-close').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var modalId = btn.getAttribute('data-modal');
+      var modal = document.getElementById(modalId);
+      if (modal) modal.close();
+    });
+  });
+
+  // Close modal on backdrop click
+  document.querySelectorAll('dialog').forEach(function (dialog) {
+    dialog.addEventListener('click', function (e) {
+      if (e.target === dialog) dialog.close();
+    });
+  });
+
+  // Reserve form submission
+  document.querySelectorAll('form[id^="reserve-form-"]').forEach(function (form) {
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var productId = form.id.replace('reserve-form-', '');
+      var shopId = document.querySelector('[data-product-id="' + productId + '"]')?.getAttribute('data-shop-id');
+      var nameInput = form.querySelector('input[name="name"]');
+      var name = nameInput ? nameInput.value.trim() : '';
+      var errorEl = document.getElementById('error-' + productId);
+
+      if (!name) {
+        if (errorEl) { errorEl.textContent = 'Пожалуйста, введите имя'; errorEl.classList.remove('hidden'); }
+        return;
+      }
+
+      fetch('/api/shops/' + shopId + '/products/' + productId + '/reserve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name })
+      })
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+          if (data.success) {
+            // Close modal
+            var modal = document.getElementById('modal-' + productId);
+            if (modal) modal.close();
+
+            // Save to localStorage so we can identify "reserved by me"
+            localStorage.setItem('reserved_' + productId, '1');
+
+            // Update card UI: replace bottom row with success status
+            var card = document.getElementById('card-' + productId);
+            if (card) {
+              var statusRow = card.querySelector('.mt-auto');
+              if (statusRow) {
+                statusRow.innerHTML = '<div class="w-full flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2"><svg class="w-4 h-4 text-amber-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg><span class="text-sm font-medium text-amber-800">Забронировано вами</span></div>';
+              }
+            }
+          } else {
+            if (errorEl) {
+              errorEl.textContent = data.error || 'Ошибка бронирования';
+              errorEl.classList.remove('hidden');
+            }
+          }
+        })
+        .catch(function () {
+          if (errorEl) { errorEl.textContent = 'Произошла ошибка. Попробуйте ещё раз.'; errorEl.classList.remove('hidden'); }
+        });
+    });
+  });
+})();
+</script>

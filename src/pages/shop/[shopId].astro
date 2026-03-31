@@ -1,0 +1,49 @@
+---
+import { getShop, getProducts, getProductImages } from '../../lib/db';
+import Layout from '../../layouts/Layout.astro';
+import ProductCard from '../../components/ProductCard.astro';
+
+const { shopId } = Astro.params;
+
+if (!shopId) {
+  return new Response(null, { status: 404 });
+}
+
+const shop = getShop(shopId);
+if (!shop) {
+  return new Response(null, { status: 404 });
+}
+
+const products = getProducts(shopId);
+
+const productsWithImages = products.map((product) => ({
+  ...product,
+  images: getProductImages(product.id),
+}));
+---
+
+<Layout title={shop.name} showHeader={true}>
+  <main class="max-w-6xl mx-auto px-4 py-8">
+    <div class="mb-8">
+      <h1 class="text-3xl font-bold text-gray-900">{shop.name}</h1>
+      <p class="text-sm text-gray-500 mt-1">
+        {productsWithImages.length} {productsWithImages.length === 1 ? 'товар' : productsWithImages.length < 5 ? 'товара' : 'товаров'}
+      </p>
+    </div>
+
+    {productsWithImages.length === 0 ? (
+      <div class="text-center py-20 text-gray-400">
+        <svg class="w-16 h-16 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+        </svg>
+        <p class="text-lg font-medium">Товары не найдены</p>
+      </div>
+    ) : (
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {productsWithImages.map((product) => (
+          <ProductCard product={product} shopId={shopId} />
+        ))}
+      </div>
+    )}
+  </main>
+</Layout>

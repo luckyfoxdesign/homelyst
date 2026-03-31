@@ -1,0 +1,15 @@
+services:
+  app:
+    build: .
+    ports:
+      - "4321:4321"
+    volumes:
+      - db_data:/app/data
+    environment:
+      - ADMIN_PASSWORD=changeme
+      - DATABASE_PATH=/app/data/db.sqlite
+      - HOST=0.0.0.0
+      - PORT=4321
+    restart: unless-stopped
+volumes:
+  db_data:
