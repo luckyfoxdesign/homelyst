@@ -128,6 +128,7 @@ let createError = '';
   var modalName = document.getElementById('delete-shop-name');
   var confirmBtn = document.getElementById('delete-shop-confirm');
   var cancelBtn = document.getElementById('delete-shop-cancel');
+  if (!modal || !modalName || !confirmBtn || !cancelBtn) return;
   var pendingShopId = '';
   var pendingBtn: HTMLElement | null = null;
 
@@ -135,12 +136,12 @@ let createError = '';
     btn.addEventListener('click', function () {
       pendingShopId = btn.getAttribute('data-shop-id') || '';
       pendingBtn = btn as HTMLElement;
-      modalName!.textContent = btn.getAttribute('data-shop-name') || '';
+      modalName.textContent = btn.getAttribute('data-shop-name') || '';
       modal.showModal();
     });
   });
 
-  cancelBtn!.addEventListener('click', function () {
+  cancelBtn.addEventListener('click', function () {
     modal.close();
   });
 
@@ -148,7 +149,7 @@ let createError = '';
     if (e.target === modal) modal.close();
   });
 
-  confirmBtn!.addEventListener('click', function () {
+  confirmBtn.addEventListener('click', function () {
     modal.close();
     if (!pendingShopId || !pendingBtn) return;
     (pendingBtn as HTMLButtonElement).disabled = true;
