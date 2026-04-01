@@ -123,6 +123,8 @@
         var successMsg = document.getElementById("contact-success");
         var emailInput = document.getElementById("contact-email");
 
+        if (!btn || !popover || !backdrop || !cancelBtn || !form || !successMsg || !emailInput) return;
+
         function openPopover() {
             popover.classList.remove("hidden");
             setTimeout(function () {
