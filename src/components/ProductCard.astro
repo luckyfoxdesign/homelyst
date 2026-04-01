@@ -44,10 +44,9 @@ const modalId = `modal-${product.id}`;
           <img
             src={`/api/uploads/${shopId}/${product.id}/${img.filename}`}
             alt={`${product.title} - фото ${idx + 1}`}
-            class={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 gallery-slide`}
+            class={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 gallery-slide${idx === 0 ? '' : ' opacity-0 pointer-events-none'}`}
             data-gallery={product.id}
             data-index={idx}
-            style={idx === 0 ? 'opacity:1;' : 'opacity:0;pointer-events:none;'}
             loading="lazy"
           />
         ))}
@@ -247,13 +246,13 @@ const modalId = `modal-${product.id}`;
       var dots = document.querySelectorAll('[data-gallery="' + galleryId + '"].gallery-dot');
       var currentIndex = 0;
       for (var i = 0; i < slides.length; i++) {
-        if (slides[i].style.opacity === '1') { currentIndex = i; break; }
+        if (!slides[i].classList.contains('opacity-0')) { currentIndex = i; break; }
       }
       var direction = btn.classList.contains('gallery-prev') ? -1 : 1;
       var nextIndex = (currentIndex + direction + count) % count;
       for (var j = 0; j < slides.length; j++) {
-        slides[j].style.opacity = j === nextIndex ? '1' : '0';
-        slides[j].style.pointerEvents = j === nextIndex ? '' : 'none';
+        slides[j].classList.toggle('opacity-0', j !== nextIndex);
+        slides[j].classList.toggle('pointer-events-none', j !== nextIndex);
       }
       for (var k = 0; k < dots.length; k++) {
         dots[k].classList.toggle('bg-white', k === nextIndex);
@@ -269,8 +268,8 @@ const modalId = `modal-${product.id}`;
       var slides = document.querySelectorAll('[data-gallery="' + galleryId + '"].gallery-slide');
       var dots = document.querySelectorAll('[data-gallery="' + galleryId + '"].gallery-dot');
       for (var i = 0; i < slides.length; i++) {
-        slides[i].style.opacity = i === targetIndex ? '1' : '0';
-        slides[i].style.pointerEvents = i === targetIndex ? '' : 'none';
+        slides[i].classList.toggle('opacity-0', i !== targetIndex);
+        slides[i].classList.toggle('pointer-events-none', i !== targetIndex);
       }
       for (var k = 0; k < dots.length; k++) {
         dots[k].classList.toggle('bg-white', k === targetIndex);

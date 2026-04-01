@@ -28,13 +28,20 @@ let createError = '';
       ) : (
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {shops.map((shop) => (
-            <a
-              href={`/admin/${shop.id}`}
-              class="bg-white rounded-2xl shadow-sm hover:shadow-md transition-shadow p-5 flex flex-col gap-1"
-            >
-              <span class="font-semibold text-gray-900">{shop.name}</span>
-              <span class="text-xs text-gray-400">{shop.id}</span>
-            </a>
+            <div class="bg-white rounded-2xl shadow-sm hover:shadow-md transition-shadow p-5 flex items-center justify-between gap-3">
+              <a href={`/admin/${shop.id}`} class="flex flex-col gap-1 min-w-0 flex-1">
+                <span class="font-semibold text-gray-900 truncate">{shop.name}</span>
+                <span class="text-xs text-gray-400">{shop.id}</span>
+              </a>
+              <button
+                type="button"
+                class="delete-shop-btn shrink-0 text-xs text-red-500 hover:text-red-700 border border-red-200 hover:bg-red-50 rounded-lg px-3 py-1.5 transition-colors"
+                data-shop-id={shop.id}
+                data-shop-name={shop.name}
+              >
+                Удалить
+              </button>
+            </div>
           ))}
         </div>
       )}
@@ -82,3 +89,83 @@ let createError = '';
     </section>
   </main>
 </Layout>
+
+<!-- Delete shop confirmation modal -->
+<dialog
+  id="delete-shop-modal"
+  class="rounded-2xl shadow-2xl p-0 backdrop:bg-black/50 w-full max-w-sm mx-auto"
+>
+  <div class="p-6">
+    <h2 class="text-lg font-semibold text-gray-900 mb-2">Удалить магазин?</h2>
+    <p class="text-sm text-gray-600 mb-1">
+      Вы собираетесь удалить магазин <strong id="delete-shop-name" class="text-gray-900"></strong>.
+    </p>
+    <p class="text-sm text-red-600 mb-6">
+      Все товары и фотографии будут удалены безвозвратно.
+    </p>
+    <div class="flex gap-3">
+      <button
+        id="delete-shop-confirm"
+        type="button"
+        class="flex-1 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg px-4 py-2 min-h-10 text-sm transition-colors"
+      >
+        Удалить
+      </button>
+      <button
+        id="delete-shop-cancel"
+        type="button"
+        class="flex-1 border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium rounded-lg px-4 py-2 min-h-10 text-sm transition-colors"
+      >
+        Отмена
+      </button>
+    </div>
+  </div>
+</dialog>
+
+<script>
+(function () {
+  var modal = document.getElementById('delete-shop-modal') as HTMLDialogElement;
+  var modalName = document.getElementById('delete-shop-name');
+  var confirmBtn = document.getElementById('delete-shop-confirm');
+  var cancelBtn = document.getElementById('delete-shop-cancel');
+  var pendingShopId = '';
+  var pendingBtn: HTMLElement | null = null;
+
+  document.querySelectorAll('.delete-shop-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      pendingShopId = btn.getAttribute('data-shop-id') || '';
+      pendingBtn = btn as HTMLElement;
+      modalName!.textContent = btn.getAttribute('data-shop-name') || '';
+      modal.showModal();
+    });
+  });
+
+  cancelBtn!.addEventListener('click', function () {
+    modal.close();
+  });
+
+  modal.addEventListener('click', function (e) {
+    if (e.target === modal) modal.close();
+  });
+
+  confirmBtn!.addEventListener('click', function () {
+    modal.close();
+    if (!pendingShopId || !pendingBtn) return;
+    (pendingBtn as HTMLButtonElement).disabled = true;
+    fetch('/api/shops/' + pendingShopId, { method: 'DELETE' })
+      .then(function (res) { return res.json(); })
+      .then(function (data) {
+        if (data.success) {
+          window.location.reload();
+        } else {
+          alert(data.error || 'Произошла ошибка');
+          (pendingBtn as HTMLButtonElement).disabled = false;
+        }
+      })
+      .catch(function () {
+        alert('Произошла ошибка');
+        (pendingBtn as HTMLButtonElement).disabled = false;
+      });
+  });
+})();
+</script>

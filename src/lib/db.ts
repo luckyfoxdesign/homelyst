@@ -122,6 +122,10 @@ export function deleteProduct(productId: number): void {
   db.prepare('DELETE FROM products WHERE id = ?').run(productId);
 }
 
+export function deleteShop(shopId: string): void {
+  db.prepare('DELETE FROM shops WHERE id = ?').run(shopId);
+}
+
 export function getProductImages(productId: number): ProductImage[] {
   return db
     .prepare('SELECT * FROM product_images WHERE product_id = ? ORDER BY sort_order ASC')
