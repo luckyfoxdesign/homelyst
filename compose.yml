@@ -8,6 +8,8 @@ services:
       - DATABASE_PATH=/app/data/db.sqlite
       - HOST=0.0.0.0
       - PORT=4321
+    networks:
+      - internal_net
     restart: unless-stopped
 volumes:
   db_data:
