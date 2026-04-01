@@ -39,6 +39,8 @@ EOF
 
 Patch releases do not require release notes — a tag alone is sufficient.
 
+Always update the `version` field in `package.json` to match the new tag before committing.
+
 ## Environment
 
 All work happens exclusively inside Docker containers. There are no local Node/npm installs — do not attempt to run `npm`, `node`, or any project commands directly on the host machine.
