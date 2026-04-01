@@ -9,6 +9,36 @@ Do NOT read `.env` or `.env.*` files — they contain secrets. If you need to kn
 Do NOT add `Co-Authored-By: Claude` or any Anthropic authorship lines to commits.
 This causes issues on some services. Commits should be authored only by the human developer.
 
+## Versioning & Releases
+
+With every push, create a git version tag following [Semantic Versioning](https://semver.org/):
+- **Patch** (`x.y.Z`) — bug fixes, minor tweaks, dependency updates
+- **Minor** (`x.Y.0`) — new features, backward-compatible additions
+- **Major** (`X.0.0`) — breaking changes, major rewrites
+
+```bash
+git tag v1.2.3
+git push origin v1.2.3
+```
+
+For **minor and major** releases, also create a GitHub release with release notes:
+
+```bash
+gh release create v1.2.0 --title "v1.2.0 — Short description" --notes "$(cat <<'EOF'
+## What's new
+- Feature or change description
+
+## Bug fixes
+- Fix description
+
+## Breaking changes (major only)
+- Description of breaking change
+EOF
+)"
+```
+
+Patch releases do not require release notes — a tag alone is sufficient.
+
 ## Environment
 
 All work happens exclusively inside Docker containers. There are no local Node/npm installs — do not attempt to run `npm`, `node`, or any project commands directly on the host machine.
