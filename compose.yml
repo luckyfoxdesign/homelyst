@@ -5,6 +5,8 @@ services:
       - db_data:/app/data
     environment:
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
       - DATABASE_PATH=/app/data/db.sqlite
       - HOST=0.0.0.0
       - PORT=4321
