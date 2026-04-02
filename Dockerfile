@@ -1,8 +1,8 @@
-FROM node:20-alpine
+FROM oven/bun:alpine
 WORKDIR /app
-COPY package*.json ./
-RUN npm install
+COPY package.json ./
+RUN bun install
 COPY . .
-RUN npm run build
+RUN bun run build
 EXPOSE 4321
-CMD ["node", "./dist/server/entry.mjs"]
+CMD ["bun", "./dist/server/entry.mjs"]

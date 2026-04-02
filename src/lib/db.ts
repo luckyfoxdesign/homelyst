@@ -1,4 +1,4 @@
-import Database from 'better-sqlite3';
+import { Database } from 'bun:sqlite';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -11,8 +11,8 @@ fs.mkdirSync(dbDir, { recursive: true });
 const db = new Database(DB_PATH);
 
 // Enable WAL for better concurrency
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = ON');
+db.exec('PRAGMA journal_mode = WAL');
+db.exec('PRAGMA foreign_keys = ON');
 
 // Create tables
 db.exec(`
