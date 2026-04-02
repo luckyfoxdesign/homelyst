@@ -16,9 +16,44 @@ const { title = 'Shoper', showHeader = false } = Astro.props;
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{title}</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
   </head>
   <body class="bg-gray-50 min-h-screen">
     {showHeader && <Header />}
     <slot />
+    <script>
+      (function () {
+        var tg = window.Telegram?.WebApp;
+        if (!tg?.initData) return;
+
+        // Expand to full screen height
+        tg.expand();
+
+        // Hide the site header — Telegram provides its own navigation
+        var header = document.querySelector('header');
+        if (header) (header as HTMLElement).style.display = 'none';
+
+        // Apply Telegram theme colours via CSS custom properties
+        var theme = tg.themeParams;
+        if (theme) {
+          var root = document.documentElement;
+          if (theme.bg_color) root.style.setProperty('--tg-theme-bg-color', theme.bg_color);
+          if (theme.text_color) root.style.setProperty('--tg-theme-text-color', theme.text_color);
+          if (theme.button_color) root.style.setProperty('--tg-theme-button-color', theme.button_color);
+          if (theme.button_text_color) root.style.setProperty('--tg-theme-button-text-color', theme.button_text_color);
+          if (theme.secondary_bg_color) document.body.style.backgroundColor = theme.secondary_bg_color;
+        }
+
+        // BackButton — navigate back or close the Mini App
+        tg.BackButton.show();
+        tg.BackButton.onClick(function () {
+          if (window.history.length > 1) {
+            window.history.back();
+          } else {
+            tg.close();
+          }
+        });
+      })();
+    </script>
   </body>
 </html>

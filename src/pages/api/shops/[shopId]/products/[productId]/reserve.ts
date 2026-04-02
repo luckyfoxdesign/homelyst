@@ -1,5 +1,5 @@
 import type { APIRoute } from 'astro';
-import { reserveProduct } from '../../../../../../lib/db';
+import { reserveProduct, getProduct, getShop } from '../../../../../../lib/db';
 import { checkReserveLimit, getClientIp } from '../../../../../../lib/rateLimit';
 
 export const POST: APIRoute = async ({ request, params }) => {
@@ -45,6 +45,25 @@ export const POST: APIRoute = async ({ request, params }) => {
         status: 409,
         headers: { 'Content-Type': 'application/json' },
       });
+    }
+
+    // Notify owner via Telegram bot (non-blocking)
+    const botToken = process.env.BOT_TOKEN;
+    const ownerChatId = process.env.OWNER_CHAT_ID;
+    if (botToken && ownerChatId) {
+      const product = getProduct(parseInt(productId, 10));
+      const shop = shopId ? getShop(shopId) : undefined;
+      if (product && shop) {
+        const text =
+          `Новая бронь в «${shop.name}»\n` +
+          `Что: ${product.title}\n` +
+          `Кто: ${name}`;
+        fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ chat_id: ownerChatId, text }),
+        }).catch(() => {});
+      }
     }
 
     return new Response(JSON.stringify({ success: true }), {

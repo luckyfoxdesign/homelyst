@@ -1,7 +1,8 @@
 import { defineMiddleware } from 'astro:middleware';
 import { isAuthenticated } from './lib/auth';
 
-const SECURITY_HEADERS: Record<string, string> = {
+// Strict headers for admin and all other routes
+const STRICT_HEADERS: Record<string, string> = {
   'X-Content-Type-Options': 'nosniff',
   'X-Frame-Options': 'DENY',
   'Referrer-Policy': 'strict-origin-when-cross-origin',
@@ -15,6 +16,22 @@ const SECURITY_HEADERS: Record<string, string> = {
     "font-src 'self'",
     "connect-src 'self'",
     "frame-ancestors 'none'",
+  ].join('; '),
+};
+
+// Relaxed headers for /shop/* — Telegram Mini App opens pages in a WebView
+const SHOP_HEADERS: Record<string, string> = {
+  'X-Content-Type-Options': 'nosniff',
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
+  'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+  'Content-Security-Policy': [
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-inline' https://telegram.org",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob:",
+    "font-src 'self'",
+    "connect-src 'self' https://api.telegram.org",
+    "frame-ancestors https://web.telegram.org",
   ].join('; '),
 };
 
@@ -32,7 +49,8 @@ export const onRequest = defineMiddleware(async (context, next) => {
 
   const response = await next();
 
-  for (const [header, value] of Object.entries(SECURITY_HEADERS)) {
+  const headers = pathname.startsWith('/shop/') ? SHOP_HEADERS : STRICT_HEADERS;
+  for (const [header, value] of Object.entries(headers)) {
     response.headers.set(header, value);
   }
 
