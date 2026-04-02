@@ -137,12 +137,12 @@ const modalId = `modal-${product.id}`;
   </div>
 </div>
 
-<!-- Reservation Modal -->
+<!-- Reservation Modal (browser only — hidden by default via inline style) -->
 {product.status === 'available' && (
   <div
     id={modalId}
-    class="modal-overlay hidden fixed inset-0 z-50 flex items-center justify-center p-4"
-    style="background: rgba(0,0,0,0.5)"
+    class="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4"
+    style="display:none; background:rgba(0,0,0,0.5)"
   >
     <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
       <div class="p-6">
@@ -187,55 +187,39 @@ const modalId = `modal-${product.id}`;
   </div>
 )}
 
-<script>
+<script is:inline>
 (function () {
-  // Telegram Mini App user (available when opened via bot)
-  var tmaUser = window.Telegram?.WebApp?.initDataUnsafe?.user || null;
+  // Run init only once even if component is used multiple times on the page
+  if (window.__reserveInited) return;
+  window.__reserveInited = true;
 
-  // Pre-fill name inputs with Telegram display name
-  if (tmaUser) {
-    var displayName = tmaUser.first_name + (tmaUser.last_name ? ' ' + tmaUser.last_name : '');
-    document.querySelectorAll('input[name="name"]').forEach(function (input) {
-      input.value = displayName;
-    });
-  }
+  var tmaUser = (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe && window.Telegram.WebApp.initDataUnsafe.user) || null;
 
-  // Toast notification
+  // --- Helpers ---
+
   function showToast(message, type) {
     var existing = document.getElementById('__toast__');
     if (existing) existing.remove();
-
     var toast = document.createElement('div');
     toast.id = '__toast__';
     var bg = type === 'error' ? '#ef4444' : '#22c55e';
     toast.style.cssText = [
-      'position:fixed',
-      'bottom:24px',
-      'left:50%',
+      'position:fixed', 'bottom:24px', 'left:50%',
       'transform:translateX(-50%) translateY(20px)',
-      'background:' + bg,
-      'color:#fff',
-      'padding:12px 20px',
-      'border-radius:12px',
-      'font-size:14px',
-      'font-weight:500',
-      'box-shadow:0 4px 16px rgba(0,0,0,0.15)',
-      'z-index:9999',
-      'opacity:0',
-      'transition:opacity 0.25s ease, transform 0.25s ease',
-      'white-space:nowrap',
-      'pointer-events:none'
+      'background:' + bg, 'color:#fff', 'padding:12px 20px',
+      'border-radius:12px', 'font-size:14px', 'font-weight:500',
+      'box-shadow:0 4px 16px rgba(0,0,0,0.15)', 'z-index:9999',
+      'opacity:0', 'transition:opacity 0.25s ease, transform 0.25s ease',
+      'white-space:nowrap', 'pointer-events:none'
     ].join(';');
     toast.textContent = message;
     document.body.appendChild(toast);
-
     requestAnimationFrame(function () {
       requestAnimationFrame(function () {
         toast.style.opacity = '1';
         toast.style.transform = 'translateX(-50%) translateY(0)';
       });
     });
-
     setTimeout(function () {
       toast.style.opacity = '0';
       toast.style.transform = 'translateX(-50%) translateY(20px)';
@@ -243,15 +227,50 @@ const modalId = `modal-${product.id}`;
     }, 3000);
   }
 
-  // Mark reserved-by-me badges on page load
+  function openModal(modal) { modal.style.display = 'flex'; }
+  function closeModal(modal) { modal.style.display = 'none'; }
+
+  function markCardReserved(productId) {
+    localStorage.setItem('reserved_' + productId, '1');
+    var card = document.getElementById('card-' + productId);
+    if (!card) return;
+    var statusRow = card.querySelector('.mt-auto');
+    if (statusRow) {
+      statusRow.innerHTML = '<div class="w-full flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2"><svg class="w-4 h-4 text-amber-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg><span class="text-sm font-medium text-amber-800">Забронировано вами</span></div>';
+    }
+  }
+
+  function doReserve(shopId, productId, name, tmaUserData, onSuccess, onError) {
+    fetch('/api/shops/' + shopId + '/products/' + productId + '/reserve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: name,
+        tmaUser: tmaUserData ? {
+          id: tmaUserData.id,
+          first_name: tmaUserData.first_name,
+          last_name: tmaUserData.last_name || null,
+          username: tmaUserData.username || null,
+        } : null,
+      }),
+    })
+      .then(function (res) { return res.json(); })
+      .then(function (data) {
+        if (data.success) { onSuccess(); }
+        else { onError(data.error || 'Ошибка бронирования'); }
+      })
+      .catch(function () { onError('Произошла ошибка. Попробуйте ещё раз.'); });
+  }
+
+  // --- Init ---
+
+  // Mark "reserved by me" badges
   document.querySelectorAll('[data-reserved-badge]').forEach(function (el) {
     var pid = el.getAttribute('data-reserved-badge');
-    if (pid && localStorage.getItem('reserved_' + pid)) {
-      el.textContent = 'Забронировано вами';
-    }
+    if (pid && localStorage.getItem('reserved_' + pid)) el.textContent = 'Забронировано вами';
   });
 
-  // Gallery logic
+  // Gallery
   document.querySelectorAll('.gallery-prev, .gallery-next').forEach(function (btn) {
     btn.addEventListener('click', function () {
       var galleryId = btn.getAttribute('data-gallery');
@@ -262,8 +281,7 @@ const modalId = `modal-${product.id}`;
       for (var i = 0; i < slides.length; i++) {
         if (!slides[i].classList.contains('opacity-0')) { currentIndex = i; break; }
       }
-      var direction = btn.classList.contains('gallery-prev') ? -1 : 1;
-      var nextIndex = (currentIndex + direction + count) % count;
+      var nextIndex = (currentIndex + (btn.classList.contains('gallery-prev') ? -1 : 1) + count) % count;
       for (var j = 0; j < slides.length; j++) {
         slides[j].classList.toggle('opacity-0', j !== nextIndex);
         slides[j].classList.toggle('pointer-events-none', j !== nextIndex);
@@ -292,37 +310,49 @@ const modalId = `modal-${product.id}`;
     });
   });
 
-  // Reserve button - open modal
+  // Reserve button
   document.querySelectorAll('.reserve-btn').forEach(function (btn) {
     btn.addEventListener('click', function () {
-      var modalId = btn.getAttribute('data-modal');
-      var modal = document.getElementById(modalId);
-      if (modal) modal.classList.remove('hidden');
+      var productId = btn.getAttribute('data-product-id');
+      var shopId = btn.getAttribute('data-shop-id');
+
+      if (tmaUser) {
+        // TMA flow: book directly using Telegram identity, no modal needed
+        var buyerName = tmaUser.first_name + (tmaUser.last_name ? ' ' + tmaUser.last_name : '');
+        btn.disabled = true;
+        doReserve(shopId, productId, buyerName, tmaUser,
+          function () { markCardReserved(productId); },
+          function (err) { btn.disabled = false; showToast(err, 'error'); }
+        );
+      } else {
+        // Browser flow: open modal to enter name
+        var modal = document.getElementById(btn.getAttribute('data-modal'));
+        if (modal) openModal(modal);
+      }
     });
   });
 
   // Modal close button
   document.querySelectorAll('.modal-close').forEach(function (btn) {
     btn.addEventListener('click', function () {
-      var modalId = btn.getAttribute('data-modal');
-      var modal = document.getElementById(modalId);
-      if (modal) modal.classList.add('hidden');
+      var modal = document.getElementById(btn.getAttribute('data-modal'));
+      if (modal) closeModal(modal);
     });
   });
 
-  // Close modal on backdrop click
+  // Close on backdrop click
   document.querySelectorAll('.modal-overlay').forEach(function (overlay) {
     overlay.addEventListener('click', function (e) {
-      if (e.target === overlay) overlay.classList.add('hidden');
+      if (e.target === overlay) closeModal(overlay);
     });
   });
 
-  // Reserve form submission
+  // Modal form submission (browser only)
   document.querySelectorAll('form[id^="reserve-form-"]').forEach(function (form) {
     form.addEventListener('submit', function (e) {
       e.preventDefault();
       var productId = form.id.replace('reserve-form-', '');
-      var shopId = document.querySelector('[data-product-id="' + productId + '"]')?.getAttribute('data-shop-id');
+      var shopId = document.querySelector('[data-product-id="' + productId + '"]').getAttribute('data-shop-id');
       var nameInput = form.querySelector('input[name="name"]');
       var name = nameInput ? nameInput.value.trim() : '';
       var errorEl = document.getElementById('error-' + productId);
@@ -332,47 +362,20 @@ const modalId = `modal-${product.id}`;
         return;
       }
 
-      fetch('/api/shops/' + shopId + '/products/' + productId + '/reserve', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: name,
-          tmaUser: tmaUser ? {
-            id: tmaUser.id,
-            first_name: tmaUser.first_name,
-            last_name: tmaUser.last_name || null,
-            username: tmaUser.username || null,
-          } : null,
-        })
-      })
-        .then(function (res) { return res.json(); })
-        .then(function (data) {
-          if (data.success) {
-            // Close modal
-            var modal = document.getElementById('modal-' + productId);
-            if (modal) modal.classList.add('hidden');
+      var submitBtn = form.querySelector('button[type="submit"]');
+      if (submitBtn) submitBtn.disabled = true;
 
-            // Save to localStorage so we can identify "reserved by me"
-            localStorage.setItem('reserved_' + productId, '1');
-
-            // Update card UI: replace bottom row with success status
-            var card = document.getElementById('card-' + productId);
-            if (card) {
-              var statusRow = card.querySelector('.mt-auto');
-              if (statusRow) {
-                statusRow.innerHTML = '<div class="w-full flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2"><svg class="w-4 h-4 text-amber-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg><span class="text-sm font-medium text-amber-800">Забронировано вами</span></div>';
-              }
-            }
-          } else {
-            if (errorEl) {
-              errorEl.textContent = data.error || 'Ошибка бронирования';
-              errorEl.classList.remove('hidden');
-            }
-          }
-        })
-        .catch(function () {
-          if (errorEl) { errorEl.textContent = 'Произошла ошибка. Попробуйте ещё раз.'; errorEl.classList.remove('hidden'); }
-        });
+      doReserve(shopId, productId, name, null,
+        function () {
+          var modal = document.getElementById('modal-' + productId);
+          if (modal) closeModal(modal);
+          markCardReserved(productId);
+        },
+        function (err) {
+          if (submitBtn) submitBtn.disabled = false;
+          if (errorEl) { errorEl.textContent = err; errorEl.classList.remove('hidden'); }
+        }
+      );
     });
   });
 })();

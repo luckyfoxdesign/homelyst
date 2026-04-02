@@ -21,17 +21,16 @@ const { title = 'Shoper', showHeader = false } = Astro.props;
   <body class="bg-gray-50 min-h-screen">
     {showHeader && <Header />}
     <slot />
-    <script>
+    <script is:inline>
       (function () {
-        var tg = window.Telegram?.WebApp;
-        if (!tg?.initData) return;
+        var tg = window.Telegram && window.Telegram.WebApp;
+        if (!tg || !tg.initData) return;
 
-        // Expand to full screen height
         tg.expand();
 
         // Hide the site header — Telegram provides its own navigation
         var header = document.querySelector('header');
-        if (header) (header as HTMLElement).style.display = 'none';
+        if (header) header.style.display = 'none';
 
         // Apply Telegram theme colours via CSS custom properties
         var theme = tg.themeParams;
@@ -45,14 +44,16 @@ const { title = 'Shoper', showHeader = false } = Astro.props;
         }
 
         // BackButton — navigate back or close the Mini App
-        tg.BackButton.show();
-        tg.BackButton.onClick(function () {
-          if (window.history.length > 1) {
-            window.history.back();
-          } else {
-            tg.close();
-          }
-        });
+        if (tg.BackButton) {
+          tg.BackButton.show();
+          tg.BackButton.onClick(function () {
+            if (window.history.length > 1) {
+              window.history.back();
+            } else {
+              tg.close();
+            }
+          });
+        }
       })();
     </script>
   </body>
