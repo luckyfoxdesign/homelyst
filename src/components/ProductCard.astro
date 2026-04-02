@@ -194,10 +194,6 @@ const modalId = `modal-${product.id}`;
   if (window.__reserveInited) return;
   window.__reserveInited = true;
 
-  var tg = window.Telegram && window.Telegram.WebApp;
-  var isTMA = !!(tg && tg.initData);
-  var tmaUser = isTMA ? ((tg.initDataUnsafe && tg.initDataUnsafe.user) || null) : null;
-
   // --- Helpers ---
 
   function showToast(message, type) {
@@ -268,6 +264,12 @@ const modalId = `modal-${product.id}`;
   // --- Init (runs after full DOM is ready so all cards are present) ---
 
   function init() {
+    // Detect Telegram Mini App — done here (DOMContentLoaded) to give the
+    // Telegram SDK time to fully initialize initData from the URL hash.
+    var tg = window.Telegram && window.Telegram.WebApp;
+    var isTMA = !!(tg && tg.initData);
+    var tmaUser = isTMA ? ((tg.initDataUnsafe && tg.initDataUnsafe.user) || null) : null;
+
     // Mark "reserved by me" badges
     document.querySelectorAll('[data-reserved-badge]').forEach(function (el) {
       var pid = el.getAttribute('data-reserved-badge');
