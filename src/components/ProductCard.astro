@@ -189,11 +189,14 @@ const modalId = `modal-${product.id}`;
 
 <script is:inline>
 (function () {
-  // Run init only once even if component is used multiple times on the page
+  // Run init only once even if component is used multiple times on the page.
+  // Defer to DOMContentLoaded so ALL cards are in the DOM before we query them.
   if (window.__reserveInited) return;
   window.__reserveInited = true;
 
-  var tmaUser = (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe && window.Telegram.WebApp.initDataUnsafe.user) || null;
+  var tg = window.Telegram && window.Telegram.WebApp;
+  var isTMA = !!(tg && tg.initData);
+  var tmaUser = isTMA ? ((tg.initDataUnsafe && tg.initDataUnsafe.user) || null) : null;
 
   // --- Helpers ---
 
@@ -262,121 +265,131 @@ const modalId = `modal-${product.id}`;
       .catch(function () { onError('Произошла ошибка. Попробуйте ещё раз.'); });
   }
 
-  // --- Init ---
+  // --- Init (runs after full DOM is ready so all cards are present) ---
 
-  // Mark "reserved by me" badges
-  document.querySelectorAll('[data-reserved-badge]').forEach(function (el) {
-    var pid = el.getAttribute('data-reserved-badge');
-    if (pid && localStorage.getItem('reserved_' + pid)) el.textContent = 'Забронировано вами';
-  });
-
-  // Gallery
-  document.querySelectorAll('.gallery-prev, .gallery-next').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      var galleryId = btn.getAttribute('data-gallery');
-      var count = parseInt(btn.getAttribute('data-count') || '0', 10);
-      var slides = document.querySelectorAll('[data-gallery="' + galleryId + '"].gallery-slide');
-      var dots = document.querySelectorAll('[data-gallery="' + galleryId + '"].gallery-dot');
-      var currentIndex = 0;
-      for (var i = 0; i < slides.length; i++) {
-        if (!slides[i].classList.contains('opacity-0')) { currentIndex = i; break; }
-      }
-      var nextIndex = (currentIndex + (btn.classList.contains('gallery-prev') ? -1 : 1) + count) % count;
-      for (var j = 0; j < slides.length; j++) {
-        slides[j].classList.toggle('opacity-0', j !== nextIndex);
-        slides[j].classList.toggle('pointer-events-none', j !== nextIndex);
-      }
-      for (var k = 0; k < dots.length; k++) {
-        dots[k].classList.toggle('bg-white', k === nextIndex);
-        dots[k].classList.toggle('bg-white/50', k !== nextIndex);
-      }
+  function init() {
+    // Mark "reserved by me" badges
+    document.querySelectorAll('[data-reserved-badge]').forEach(function (el) {
+      var pid = el.getAttribute('data-reserved-badge');
+      if (pid && localStorage.getItem('reserved_' + pid)) el.textContent = 'Забронировано вами';
     });
-  });
 
-  document.querySelectorAll('.gallery-dot').forEach(function (dot) {
-    dot.addEventListener('click', function () {
-      var galleryId = dot.getAttribute('data-gallery');
-      var targetIndex = parseInt(dot.getAttribute('data-index') || '0', 10);
-      var slides = document.querySelectorAll('[data-gallery="' + galleryId + '"].gallery-slide');
-      var dots = document.querySelectorAll('[data-gallery="' + galleryId + '"].gallery-dot');
-      for (var i = 0; i < slides.length; i++) {
-        slides[i].classList.toggle('opacity-0', i !== targetIndex);
-        slides[i].classList.toggle('pointer-events-none', i !== targetIndex);
-      }
-      for (var k = 0; k < dots.length; k++) {
-        dots[k].classList.toggle('bg-white', k === targetIndex);
-        dots[k].classList.toggle('bg-white/50', k !== targetIndex);
-      }
-    });
-  });
-
-  // Reserve button
-  document.querySelectorAll('.reserve-btn').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      var productId = btn.getAttribute('data-product-id');
-      var shopId = btn.getAttribute('data-shop-id');
-
-      if (tmaUser) {
-        // TMA flow: book directly using Telegram identity, no modal needed
-        var buyerName = tmaUser.first_name + (tmaUser.last_name ? ' ' + tmaUser.last_name : '');
-        btn.disabled = true;
-        doReserve(shopId, productId, buyerName, tmaUser,
-          function () { markCardReserved(productId); },
-          function (err) { btn.disabled = false; showToast(err, 'error'); }
-        );
-      } else {
-        // Browser flow: open modal to enter name
-        var modal = document.getElementById(btn.getAttribute('data-modal'));
-        if (modal) openModal(modal);
-      }
-    });
-  });
-
-  // Modal close button
-  document.querySelectorAll('.modal-close').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      var modal = document.getElementById(btn.getAttribute('data-modal'));
-      if (modal) closeModal(modal);
-    });
-  });
-
-  // Close on backdrop click
-  document.querySelectorAll('.modal-overlay').forEach(function (overlay) {
-    overlay.addEventListener('click', function (e) {
-      if (e.target === overlay) closeModal(overlay);
-    });
-  });
-
-  // Modal form submission (browser only)
-  document.querySelectorAll('form[id^="reserve-form-"]').forEach(function (form) {
-    form.addEventListener('submit', function (e) {
-      e.preventDefault();
-      var productId = form.id.replace('reserve-form-', '');
-      var shopId = document.querySelector('[data-product-id="' + productId + '"]').getAttribute('data-shop-id');
-      var nameInput = form.querySelector('input[name="name"]');
-      var name = nameInput ? nameInput.value.trim() : '';
-      var errorEl = document.getElementById('error-' + productId);
-
-      if (!name) {
-        if (errorEl) { errorEl.textContent = 'Пожалуйста, введите имя'; errorEl.classList.remove('hidden'); }
-        return;
-      }
-
-      var submitBtn = form.querySelector('button[type="submit"]');
-      if (submitBtn) submitBtn.disabled = true;
-
-      doReserve(shopId, productId, name, null,
-        function () {
-          var modal = document.getElementById('modal-' + productId);
-          if (modal) closeModal(modal);
-          markCardReserved(productId);
-        },
-        function (err) {
-          if (submitBtn) submitBtn.disabled = false;
-          if (errorEl) { errorEl.textContent = err; errorEl.classList.remove('hidden'); }
+    // Gallery
+    document.querySelectorAll('.gallery-prev, .gallery-next').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var galleryId = btn.getAttribute('data-gallery');
+        var count = parseInt(btn.getAttribute('data-count') || '0', 10);
+        var slides = document.querySelectorAll('[data-gallery="' + galleryId + '"].gallery-slide');
+        var dots = document.querySelectorAll('[data-gallery="' + galleryId + '"].gallery-dot');
+        var currentIndex = 0;
+        for (var i = 0; i < slides.length; i++) {
+          if (!slides[i].classList.contains('opacity-0')) { currentIndex = i; break; }
         }
-      );
+        var nextIndex = (currentIndex + (btn.classList.contains('gallery-prev') ? -1 : 1) + count) % count;
+        for (var j = 0; j < slides.length; j++) {
+          slides[j].classList.toggle('opacity-0', j !== nextIndex);
+          slides[j].classList.toggle('pointer-events-none', j !== nextIndex);
+        }
+        for (var k = 0; k < dots.length; k++) {
+          dots[k].classList.toggle('bg-white', k === nextIndex);
+          dots[k].classList.toggle('bg-white/50', k !== nextIndex);
+        }
+      });
     });
-  });
+
+    document.querySelectorAll('.gallery-dot').forEach(function (dot) {
+      dot.addEventListener('click', function () {
+        var galleryId = dot.getAttribute('data-gallery');
+        var targetIndex = parseInt(dot.getAttribute('data-index') || '0', 10);
+        var slides = document.querySelectorAll('[data-gallery="' + galleryId + '"].gallery-slide');
+        var dots = document.querySelectorAll('[data-gallery="' + galleryId + '"].gallery-dot');
+        for (var i = 0; i < slides.length; i++) {
+          slides[i].classList.toggle('opacity-0', i !== targetIndex);
+          slides[i].classList.toggle('pointer-events-none', i !== targetIndex);
+        }
+        for (var k = 0; k < dots.length; k++) {
+          dots[k].classList.toggle('bg-white', k === targetIndex);
+          dots[k].classList.toggle('bg-white/50', k !== targetIndex);
+        }
+      });
+    });
+
+    // Reserve button
+    document.querySelectorAll('.reserve-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var productId = btn.getAttribute('data-product-id');
+        var shopId = btn.getAttribute('data-shop-id');
+
+        if (isTMA) {
+          // TMA flow: book directly using Telegram identity, no modal needed
+          var buyerName = tmaUser
+            ? tmaUser.first_name + (tmaUser.last_name ? ' ' + tmaUser.last_name : '')
+            : 'Telegram';
+          btn.disabled = true;
+          doReserve(shopId, productId, buyerName, tmaUser,
+            function () { markCardReserved(productId); },
+            function (err) { btn.disabled = false; showToast(err, 'error'); }
+          );
+        } else {
+          // Browser flow: open modal to enter name
+          var modal = document.getElementById(btn.getAttribute('data-modal'));
+          if (modal) openModal(modal);
+        }
+      });
+    });
+
+    // Modal close button
+    document.querySelectorAll('.modal-close').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var modal = document.getElementById(btn.getAttribute('data-modal'));
+        if (modal) closeModal(modal);
+      });
+    });
+
+    // Close on backdrop click
+    document.querySelectorAll('.modal-overlay').forEach(function (overlay) {
+      overlay.addEventListener('click', function (e) {
+        if (e.target === overlay) closeModal(overlay);
+      });
+    });
+
+    // Modal form submission (browser only)
+    document.querySelectorAll('form[id^="reserve-form-"]').forEach(function (form) {
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var productId = form.id.replace('reserve-form-', '');
+        var shopId = document.querySelector('[data-product-id="' + productId + '"]').getAttribute('data-shop-id');
+        var nameInput = form.querySelector('input[name="name"]');
+        var name = nameInput ? nameInput.value.trim() : '';
+        var errorEl = document.getElementById('error-' + productId);
+
+        if (!name) {
+          if (errorEl) { errorEl.textContent = 'Пожалуйста, введите имя'; errorEl.classList.remove('hidden'); }
+          return;
+        }
+
+        var submitBtn = form.querySelector('button[type="submit"]');
+        if (submitBtn) submitBtn.disabled = true;
+
+        doReserve(shopId, productId, name, null,
+          function () {
+            var modal = document.getElementById('modal-' + productId);
+            if (modal) closeModal(modal);
+            markCardReserved(productId);
+          },
+          function (err) {
+            if (submitBtn) submitBtn.disabled = false;
+            if (errorEl) { errorEl.textContent = err; errorEl.classList.remove('hidden'); }
+          }
+        );
+      });
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
 })();
 </script>

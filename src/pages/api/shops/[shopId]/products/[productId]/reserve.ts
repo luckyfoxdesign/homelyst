@@ -49,8 +49,8 @@ export const POST: APIRoute = async ({ request, params }) => {
     }
 
     // Notify owner via Telegram bot (non-blocking)
-    const botToken = process.env.BOT_TOKEN;
-    const ownerChatId = process.env.OWNER_CHAT_ID;
+    const botToken = process.env.TELEGRAM_BOT_TOKEN;
+    const ownerChatId = process.env.TELEGRAM_CHAT_ID;
     if (botToken && ownerChatId) {
       const product = getProduct(parseInt(productId, 10));
       const shop = shopId ? getShop(shopId) : undefined;
