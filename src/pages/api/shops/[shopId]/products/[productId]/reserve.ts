@@ -23,6 +23,7 @@ export const POST: APIRoute = async ({ request, params }) => {
   try {
     const body = await request.json();
     const name = (body?.name ?? '').toString().trim();
+    const tmaUser = body?.tmaUser ?? null;
 
     if (!name) {
       return new Response(JSON.stringify({ error: 'Имя обязательно' }), {
@@ -54,10 +55,17 @@ export const POST: APIRoute = async ({ request, params }) => {
       const product = getProduct(parseInt(productId, 10));
       const shop = shopId ? getShop(shopId) : undefined;
       if (product && shop) {
+        let whoLine = `Кто: ${name}`;
+        if (tmaUser?.first_name) {
+          const fullName = [tmaUser.first_name, tmaUser.last_name].filter(Boolean).join(' ');
+          whoLine = tmaUser.username
+            ? `Кто: ${fullName} (@${tmaUser.username})`
+            : `Кто: ${fullName}`;
+        }
         const text =
           `Новая бронь в «${shop.name}»\n` +
           `Что: ${product.title}\n` +
-          `Кто: ${name}`;
+          whoLine;
         fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

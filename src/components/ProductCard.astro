@@ -189,6 +189,17 @@ const modalId = `modal-${product.id}`;
 
 <script>
 (function () {
+  // Telegram Mini App user (available when opened via bot)
+  var tmaUser = window.Telegram?.WebApp?.initDataUnsafe?.user || null;
+
+  // Pre-fill name inputs with Telegram display name
+  if (tmaUser) {
+    var displayName = tmaUser.first_name + (tmaUser.last_name ? ' ' + tmaUser.last_name : '');
+    document.querySelectorAll('input[name="name"]').forEach(function (input) {
+      input.value = displayName;
+    });
+  }
+
   // Toast notification
   function showToast(message, type) {
     var existing = document.getElementById('__toast__');
@@ -324,7 +335,15 @@ const modalId = `modal-${product.id}`;
       fetch('/api/shops/' + shopId + '/products/' + productId + '/reserve', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name })
+        body: JSON.stringify({
+          name: name,
+          tmaUser: tmaUser ? {
+            id: tmaUser.id,
+            first_name: tmaUser.first_name,
+            last_name: tmaUser.last_name || null,
+            username: tmaUser.username || null,
+          } : null,
+        })
       })
         .then(function (res) { return res.json(); })
         .then(function (data) {
