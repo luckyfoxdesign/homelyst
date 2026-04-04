@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { isAuthenticated } from '../../../lib/auth';
 import { getShop, deleteShop } from '../../../lib/db';
+import { audit } from '../../../lib/audit';
 
 const UPLOADS_BASE = process.env.UPLOADS_PATH ?? '/app/data/uploads';
 
@@ -33,6 +34,7 @@ export const DELETE: APIRoute = async ({ request, params }) => {
   try {
     // Delete from DB (CASCADE handles products and product_images)
     deleteShop(shopId);
+    audit('shop_deleted', { shop_id: shopId });
 
     // Delete shop uploads directory
     const shopUploadDir = path.join(UPLOADS_BASE, shopId);

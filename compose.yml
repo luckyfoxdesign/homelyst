@@ -11,6 +11,11 @@ services:
       - DATABASE_PATH=/app/data/db.sqlite
       - HOST=0.0.0.0
       - PORT=4321
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4321/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
     networks:
       - internal_net
     restart: unless-stopped

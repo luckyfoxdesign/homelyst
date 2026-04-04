@@ -26,8 +26,21 @@ export const POST: APIRoute = async ({ request, params }) => {
     });
   }
 
+  if (product.status !== 'reserved') {
+    return new Response(JSON.stringify({ error: 'Товар не забронирован' }), {
+      status: 409,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
   try {
-    releaseReservation(product.id);
+    const changed = releaseReservation(product.id);
+    if (!changed) {
+      return new Response(JSON.stringify({ error: 'Статус товара изменился, обновите страницу' }), {
+        status: 409,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
     return new Response(JSON.stringify({ success: true }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },

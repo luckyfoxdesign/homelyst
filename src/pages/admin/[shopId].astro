@@ -1,5 +1,6 @@
 ---
 import { getShop, getProducts, getProductImages } from '../../lib/db';
+import { getCsrfToken } from '../../lib/auth';
 import Layout from '../../layouts/Layout.astro';
 
 const { shopId } = Astro.params;
@@ -18,9 +19,10 @@ const productsWithImages = products.map((p) => ({
   ...p,
   images: getProductImages(p.id),
 }));
+const csrfToken = getCsrfToken(Astro.request) ?? '';
 ---
 
-<Layout title={`Управление — ${shop.name}`}>
+<Layout title={`Управление — ${shop.name}`} csrfToken={csrfToken}>
   <main class="max-w-5xl mx-auto px-4 py-8">
     <div class="flex items-center justify-between mb-8 gap-4 flex-wrap">
       <div>
@@ -197,6 +199,17 @@ const productsWithImages = products.map((p) => ({
                     Подтвердить
                   </button>
                 )}
+                {product.status === 'reserved' && product.confirmed === 1 && (
+                  <button
+                    type="button"
+                    class="action-btn bg-gray-700 hover:bg-gray-900 text-white text-xs font-medium rounded-lg px-3 py-2 min-h-9 transition-colors"
+                    data-action="sold"
+                    data-product-id={product.id}
+                    data-shop-id={shopId}
+                  >
+                    Продано
+                  </button>
+                )}
                 {product.status === 'reserved' && (
                   <button
                     type="button"
@@ -229,8 +242,9 @@ const productsWithImages = products.map((p) => ({
 <script>
 (function () {
   var shopId = window.location.pathname.split('/').pop();
+  var csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 
-  // Add product form
+  // Add product form (multipart — no CSRF header needed, protected by SameSite=Lax)
   var addForm = document.getElementById('add-product-form');
   if (addForm) {
     addForm.addEventListener('submit', function (e) {
@@ -288,11 +302,14 @@ const productsWithImages = products.map((p) => ({
       } else if (action === 'release') {
         url = '/api/shops/' + shopIdAttr + '/products/' + productId + '/release';
         method = 'POST';
+      } else if (action === 'sold') {
+        url = '/api/shops/' + shopIdAttr + '/products/' + productId + '/sold';
+        method = 'POST';
       }
 
       btn.disabled = true;
 
-      fetch(url, { method: method })
+      fetch(url, { method: method, headers: { 'X-CSRF-Token': csrfToken } })
         .then(function (res) { return res.json(); })
         .then(function (data) {
           if (data.success) {

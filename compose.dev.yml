@@ -3,6 +3,8 @@ services:
     command: bun run dev
     ports:
       - "4321:4321"
+    environment:
+      - TRUST_LOCAL=true
     volumes:
       - db_data:/app/data
       - ./src:/app/src
@@ -10,3 +12,6 @@ services:
       - ./scripts:/app/scripts
       - ./astro.config.mjs:/app/astro.config.mjs
       - ./tailwind.config.mjs:/app/tailwind.config.mjs
+      - ./package.json:/app/package.json
+      - ./playwright.config.ts:/app/playwright.config.ts
+      - ./tests:/app/tests

@@ -1,6 +1,10 @@
 import type { APIRoute } from 'astro';
 import { isAuthenticated } from '../../../lib/auth';
-import { createShop, getShop } from '../../../lib/db';
+import { createShop, getShop, getShopCount } from '../../../lib/db';
+import { RESERVED_SLUGS } from '../../../lib/validate';
+import { audit } from '../../../lib/audit';
+
+const MAX_SHOPS = 10;
 
 export const POST: APIRoute = async ({ request }) => {
   if (!isAuthenticated(request)) {
@@ -43,6 +47,21 @@ export const POST: APIRoute = async ({ request }) => {
       });
     }
 
+    if (RESERVED_SLUGS.has(id)) {
+      return new Response(JSON.stringify({ error: 'Этот ID зарезервирован системой' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    const shopCount = getShopCount();
+    if (shopCount >= MAX_SHOPS) {
+      return new Response(JSON.stringify({ error: `Достигнут лимит магазинов (${MAX_SHOPS})` }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
     const existing = getShop(id);
     if (existing) {
       return new Response(JSON.stringify({ error: 'Магазин с таким ID уже существует' }), {
@@ -52,6 +71,7 @@ export const POST: APIRoute = async ({ request }) => {
     }
 
     const shop = createShop(id, name);
+    audit('shop_created', { shop_id: id });
 
     return new Response(null, {
       status: 302,

@@ -64,3 +64,29 @@ docker compose -f compose.yml -f compose.dev.yml run --rm app <command>
 ```
 
 Always prefer `exec` when the container is already running, and `run --rm` for one-off tasks.
+
+### Running tests
+
+Tests use Playwright (API mode, no browser). The dev container must be running first.
+
+```bash
+# Start dev container
+docker compose -f compose.yml -f compose.dev.yml up -d
+
+# Run all tests
+docker compose -f compose.yml -f compose.dev.yml exec app bun run test
+
+# Run a specific file
+docker compose -f compose.yml -f compose.dev.yml exec app bunx playwright test tests/auth.spec.ts
+```
+
+Tests read `ADMIN_PASSWORD` from the container's environment. They create and clean up their own fixtures (shops, products) automatically.
+
+### Production server access
+
+When needed (e.g. debugging headers, checking live logs), connect to the production VPS via SSH profiles:
+
+- **Main app container:** `beget_personal_vps_sudouser:homelyst/`
+- **Nginx container:** `beget_personal_vps_sudouser:homelyst-nginx/`
+
+Nginx runs in its own container — check its logs and headers there. Use this for diagnosing issues that can't be reproduced locally (e.g. proxy headers, SSL, real IP forwarding).

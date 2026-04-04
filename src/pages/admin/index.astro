@@ -1,12 +1,14 @@
 ---
 import { getShops } from '../../lib/db';
+import { getCsrfToken } from '../../lib/auth';
 import Layout from '../../layouts/Layout.astro';
 
 const shops = getShops();
 let createError = '';
+const csrfToken = getCsrfToken(Astro.request) ?? '';
 ---
 
-<Layout title="Панель администратора">
+<Layout title="Панель администратора" csrfToken={csrfToken}>
   <main class="max-w-4xl mx-auto px-4 py-8">
     <div class="flex items-center justify-between mb-8">
       <h1 class="text-3xl font-bold text-gray-900">Панель администратора</h1>
@@ -124,6 +126,7 @@ let createError = '';
 
 <script>
 (function () {
+  var csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
   var modal = document.getElementById('delete-shop-modal') as HTMLDialogElement;
   var modalName = document.getElementById('delete-shop-name');
   var confirmBtn = document.getElementById('delete-shop-confirm');
@@ -153,7 +156,7 @@ let createError = '';
     modal.close();
     if (!pendingShopId || !pendingBtn) return;
     (pendingBtn as HTMLButtonElement).disabled = true;
-    fetch('/api/shops/' + pendingShopId, { method: 'DELETE' })
+    fetch('/api/shops/' + pendingShopId, { method: 'DELETE', headers: { 'X-CSRF-Token': csrfToken } })
       .then(function (res) { return res.json(); })
       .then(function (data) {
         if (data.success) {

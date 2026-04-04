@@ -1,6 +1,6 @@
 import type { APIRoute } from 'astro';
 import { isAuthenticated } from '../../../../../../lib/auth';
-import { getProduct, confirmReservation } from '../../../../../../lib/db';
+import { getProduct, markProductSold } from '../../../../../../lib/db';
 
 export const POST: APIRoute = async ({ request, params }) => {
   if (!isAuthenticated(request)) {
@@ -26,15 +26,15 @@ export const POST: APIRoute = async ({ request, params }) => {
     });
   }
 
-  if (product.status !== 'reserved' || product.confirmed !== 0) {
-    return new Response(JSON.stringify({ error: 'Товар не в статусе ожидания подтверждения' }), {
+  if (product.status !== 'reserved' || product.confirmed !== 1) {
+    return new Response(JSON.stringify({ error: 'Товар должен быть в статусе подтверждённой брони' }), {
       status: 409,
       headers: { 'Content-Type': 'application/json' },
     });
   }
 
   try {
-    const changed = confirmReservation(product.id);
+    const changed = markProductSold(product.id);
     if (!changed) {
       return new Response(JSON.stringify({ error: 'Статус товара изменился, обновите страницу' }), {
         status: 409,
@@ -46,7 +46,7 @@ export const POST: APIRoute = async ({ request, params }) => {
       headers: { 'Content-Type': 'application/json' },
     });
   } catch (err) {
-    console.error('Error confirming reservation:', err);
+    console.error('Error marking product as sold:', err);
     return new Response(JSON.stringify({ error: 'Internal server error' }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },

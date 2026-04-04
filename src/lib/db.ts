@@ -54,9 +54,27 @@ db.exec(`
 
   CREATE TABLE IF NOT EXISTS sessions (
     token TEXT PRIMARY KEY,
+    csrf_token TEXT,
+    ip TEXT,
     created_at INTEGER DEFAULT (unixepoch())
   );
 `);
+
+// Migrate existing sessions table: add csrf_token and ip columns if missing
+try { db.exec('ALTER TABLE sessions ADD COLUMN csrf_token TEXT'); } catch {}
+try { db.exec('ALTER TABLE sessions ADD COLUMN ip TEXT'); } catch {}
+
+// Graceful shutdown: flush WAL and close DB on SIGTERM
+process.on('SIGTERM', () => {
+  db.close();
+  process.exit(0);
+});
+
+// Periodic sweeps
+setInterval(() => sweepExpiredReservations(), 5 * 60_000);
+setInterval(() => cleanExpiredSessions(), 30 * 60_000);
+
+export { db };
 
 export interface Shop {
   id: string;
@@ -85,6 +103,13 @@ export interface ProductImage {
   sort_order: number;
 }
 
+export interface SessionRow {
+  token: string;
+  csrf_token: string | null;
+  ip: string | null;
+  created_at: number;
+}
+
 export function getShop(id: string): Shop | undefined {
   return db.prepare('SELECT * FROM shops WHERE id = ?').get(id) as Shop | undefined;
 }
@@ -96,6 +121,10 @@ export function getShops(): Shop[] {
 export function createShop(id: string, name: string): Shop {
   db.prepare('INSERT INTO shops (id, name) VALUES (?, ?)').run(id, name);
   return getShop(id)!;
+}
+
+export function getShopCount(): number {
+  return (db.prepare('SELECT COUNT(*) as count FROM shops').get() as { count: number }).count;
 }
 
 export function getProducts(shopId: string): Product[] {
@@ -128,6 +157,10 @@ export function createProduct(
     'INSERT INTO products (shop_id, title, price, description, address) VALUES (?, ?, ?, ?, ?)'
   ).run(shopId, title, price, description, address);
   return getProduct(result.lastInsertRowid as number)!;
+}
+
+export function getProductCount(shopId: string): number {
+  return (db.prepare('SELECT COUNT(*) as count FROM products WHERE shop_id = ?').get(shopId) as { count: number }).count;
 }
 
 export function deleteProduct(productId: number): void {
@@ -176,25 +209,53 @@ export function reserveProduct(productId: number, name: string): boolean {
   return result.changes === 1;
 }
 
-export function confirmReservation(productId: number): void {
-  db.prepare("UPDATE products SET confirmed = 1, status = 'reserved' WHERE id = ?").run(productId);
-}
-
-export function releaseReservation(productId: number): void {
-  db.prepare(
-    "UPDATE products SET status = 'available', reserved_by = NULL, reserved_at = NULL, confirmed = 0 WHERE id = ?"
+// Atomic confirm: only from reserved + unconfirmed
+export function confirmReservation(productId: number): boolean {
+  const result = db.prepare(
+    "UPDATE products SET confirmed = 1 WHERE id = ? AND status = 'reserved' AND confirmed = 0"
   ).run(productId);
+  return result.changes === 1;
 }
 
-export function createSession(token: string): void {
-  db.prepare('INSERT INTO sessions (token) VALUES (?)').run(token);
+// Atomic release: only from reserved
+export function releaseReservation(productId: number): boolean {
+  const result = db.prepare(
+    "UPDATE products SET status = 'available', reserved_by = NULL, reserved_at = NULL, confirmed = 0 WHERE id = ? AND status = 'reserved'"
+  ).run(productId);
+  return result.changes === 1;
+}
+
+// Atomic sold: only from reserved + confirmed
+export function markProductSold(productId: number): boolean {
+  const result = db.prepare(
+    "UPDATE products SET status = 'sold' WHERE id = ? AND status = 'reserved' AND confirmed = 1"
+  ).run(productId);
+  return result.changes === 1;
+}
+
+// Global sweep of all expired reservations (run periodically)
+export function sweepExpiredReservations(): void {
+  db.prepare(`
+    UPDATE products SET status = 'available', reserved_by = NULL, reserved_at = NULL, confirmed = 0
+    WHERE status = 'reserved' AND confirmed = 0
+      AND reserved_at IS NOT NULL
+      AND reserved_at + 86400 < unixepoch()
+  `).run();
+}
+
+export function createSession(token: string, csrfToken: string, ip: string): void {
+  db.prepare('INSERT INTO sessions (token, csrf_token, ip) VALUES (?, ?, ?)').run(token, csrfToken, ip);
+}
+
+export function getSession(token: string): SessionRow | undefined {
+  return db
+    .prepare('SELECT * FROM sessions WHERE token = ? AND created_at + 86400 > unixepoch()')
+    .get(token) as SessionRow | undefined;
 }
 
 export function hasSession(token: string): boolean {
-  const row = db
-    .prepare('SELECT 1 FROM sessions WHERE token = ? AND created_at + 86400 > unixepoch()')
-    .get(token);
-  return row !== null && row !== undefined;
+  const session = getSession(token);
+  return session !== undefined;
 }
 
 export function deleteSession(token: string): void {
@@ -203,4 +264,8 @@ export function deleteSession(token: string): void {
 
 export function cleanExpiredSessions(): void {
   db.prepare('DELETE FROM sessions WHERE created_at + 86400 <= unixepoch()').run();
+}
+
+export function checkDb(): void {
+  db.prepare('SELECT 1').get();
 }

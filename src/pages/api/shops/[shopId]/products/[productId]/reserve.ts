@@ -39,6 +39,14 @@ export const POST: APIRoute = async ({ request, params }) => {
       });
     }
 
+    const product = getProduct(parseInt(productId, 10));
+    if (!product || product.shop_id !== shopId) {
+      return new Response(JSON.stringify({ error: 'Product not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
     const success = reserveProduct(parseInt(productId, 10), name);
 
     if (!success) {

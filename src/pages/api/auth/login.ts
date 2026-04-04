@@ -2,6 +2,8 @@ import type { APIRoute } from 'astro';
 import { createToken, setAuthCookie } from '../../../lib/auth';
 import { checkLoginLimit, resetLoginLimit, getClientIp } from '../../../lib/rateLimit';
 import { verifyPassword, safeEqual } from '../../../lib/password';
+import { safeRedirect } from '../../../lib/validate';
+import { audit } from '../../../lib/audit';
 
 export const POST: APIRoute = async ({ request }) => {
   const ip = getClientIp(request);
@@ -16,12 +18,8 @@ export const POST: APIRoute = async ({ request }) => {
   const formData = await request.formData();
   const password = formData.get('password')?.toString() ?? '';
 
-  // Validate redirect: must be an internal path (starts with / but not //)
   const rawRedirect = formData.get('redirect')?.toString() ?? '';
-  const redirect =
-    rawRedirect.startsWith('/') && !rawRedirect.startsWith('//') && !rawRedirect.includes(':')
-      ? rawRedirect
-      : '/admin';
+  const redirect = safeRedirect(rawRedirect);
 
   // Prefer ADMIN_PASSWORD_HASH (scrypt); fall back to plain ADMIN_PASSWORD with timing-safe compare
   const passwordHash = process.env.ADMIN_PASSWORD_HASH;
@@ -32,6 +30,7 @@ export const POST: APIRoute = async ({ request }) => {
     : safeEqual(password, adminPassword);
 
   if (!valid) {
+    audit('login_failed', { ip });
     return new Response(null, {
       status: 302,
       headers: {
@@ -41,9 +40,10 @@ export const POST: APIRoute = async ({ request }) => {
   }
 
   // Successful login — reset rate limit counter
+  audit('login_success', { ip });
   resetLoginLimit(ip);
 
-  const token = createToken();
+  const token = createToken(ip);
   const cookieValue = setAuthCookie(token);
 
   return new Response(null, {

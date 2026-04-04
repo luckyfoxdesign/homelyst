@@ -2,7 +2,9 @@ import type { APIRoute } from 'astro';
 import fs from 'node:fs';
 import path from 'node:path';
 import { isAuthenticated } from '../../../../../lib/auth';
-import { getShop, createProduct, addProductImage } from '../../../../../lib/db';
+import { getShop, createProduct, addProductImage, getProductCount } from '../../../../../lib/db';
+
+const MAX_PRODUCTS = 200;
 
 const UPLOADS_BASE = process.env.UPLOADS_PATH ?? '/app/data/uploads';
 
@@ -46,6 +48,14 @@ export const POST: APIRoute = async ({ request, params }) => {
   if (!shop) {
     return new Response(JSON.stringify({ error: 'Shop not found' }), {
       status: 404,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  const productCount = getProductCount(shopId);
+  if (productCount >= MAX_PRODUCTS) {
+    return new Response(JSON.stringify({ error: `Достигнут лимит товаров (${MAX_PRODUCTS})` }), {
+      status: 400,
       headers: { 'Content-Type': 'application/json' },
     });
   }
