@@ -14,6 +14,13 @@ const db = new Database(DB_PATH);
 db.exec('PRAGMA journal_mode = WAL');
 db.exec('PRAGMA foreign_keys = ON');
 
+// Migrate: rename size → address for existing databases
+try {
+  db.exec('ALTER TABLE products RENAME COLUMN size TO address');
+} catch {
+  // Column already renamed or table doesn't exist yet — ignore
+}
+
 // Create tables
 db.exec(`
   CREATE TABLE IF NOT EXISTS shops (
@@ -28,7 +35,7 @@ db.exec(`
     title TEXT NOT NULL,
     price REAL NOT NULL DEFAULT 0,
     description TEXT,
-    size TEXT,
+    address TEXT,
     status TEXT DEFAULT 'available',
     reserved_by TEXT,
     reserved_at INTEGER,
@@ -63,7 +70,7 @@ export interface Product {
   title: string;
   price: number;
   description: string | null;
-  size: string | null;
+  address: string | null;
   status: string;
   reserved_by: string | null;
   reserved_at: number | null;
@@ -115,11 +122,11 @@ export function createProduct(
   title: string,
   price: number,
   description: string | null,
-  size: string | null
+  address: string | null
 ): Product {
   const result = db.prepare(
-    'INSERT INTO products (shop_id, title, price, description, size) VALUES (?, ?, ?, ?, ?)'
-  ).run(shopId, title, price, description, size);
+    'INSERT INTO products (shop_id, title, price, description, address) VALUES (?, ?, ?, ?, ?)'
+  ).run(shopId, title, price, description, address);
   return getProduct(result.lastInsertRowid as number)!;
 }
 

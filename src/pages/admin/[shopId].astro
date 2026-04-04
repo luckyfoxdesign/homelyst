@@ -80,14 +80,14 @@ const productsWithImages = products.map((p) => ({
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1" for="size">
-            Размер (необязательно)
+          <label class="block text-sm font-medium text-gray-700 mb-1" for="address">
+            Адрес для получения (необязательно)
           </label>
           <input
             type="text"
-            id="size"
-            name="size"
-            placeholder="80, XS, 42..."
+            id="address"
+            name="address"
+            placeholder="ул. Ленина 5, кв. 12..."
             class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
           />
         </div>
@@ -166,7 +166,7 @@ const productsWithImages = products.map((p) => ({
                 <p class="font-medium text-gray-900 truncate">{product.title}</p>
                 <p class="text-sm text-gray-500">
                   {product.price === 0 ? 'Бесплатно' : `${product.price}€`}
-                  {product.size ? ` · ${product.size}` : ''}
+                  {product.address ? ` · ${product.address}` : ''}
                 </p>
                 <div class="mt-1">
                   {product.status === 'available' && (

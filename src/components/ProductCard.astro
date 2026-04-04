@@ -103,8 +103,8 @@ const modalId = `modal-${product.id}`;
 
     <div class="flex items-center gap-2 flex-wrap">
       <span class="text-lg font-bold text-gray-900">{priceLabel}</span>
-      {product.size && (
-        <span class="bg-blue-50 text-blue-700 text-xs px-2 py-0.5 rounded-full font-medium">{product.size}</span>
+      {product.address && (
+        <span class="bg-blue-50 text-blue-700 text-xs px-2 py-0.5 rounded-full font-medium">📍 {product.address}</span>
       )}
     </div>
 

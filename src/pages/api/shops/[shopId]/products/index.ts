@@ -54,7 +54,7 @@ export const POST: APIRoute = async ({ request, params }) => {
     const formData = await request.formData();
     const title = formData.get('title')?.toString().trim() ?? '';
     const priceRaw = formData.get('price')?.toString() ?? '0';
-    const size = formData.get('size')?.toString().trim() || null;
+    const address = formData.get('address')?.toString().trim() || null;
     const description = formData.get('description')?.toString().trim() || null;
 
     if (!title) {
@@ -78,8 +78,8 @@ export const POST: APIRoute = async ({ request, params }) => {
       });
     }
 
-    if (size && size.length > 50) {
-      return new Response(JSON.stringify({ error: 'Размер не может быть длиннее 50 символов' }), {
+    if (address && address.length > 200) {
+      return new Response(JSON.stringify({ error: 'Адрес не может быть длиннее 200 символов' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
       });
@@ -88,7 +88,7 @@ export const POST: APIRoute = async ({ request, params }) => {
     const price = parseFloat(priceRaw) || 0;
 
     // Create product
-    const product = createProduct(shopId, title, price, description, size);
+    const product = createProduct(shopId, title, price, description, address);
 
     // Handle image uploads
     const imageFiles = formData.getAll('images') as File[];
