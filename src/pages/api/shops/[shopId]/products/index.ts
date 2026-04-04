@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro';
 import fs from 'node:fs';
 import path from 'node:path';
-import { isAuthenticated } from '../../../../../lib/auth';
+import { requireOwner } from '../../../../../lib/auth';
 import { getShop, createProduct, addProductImage, getProductCount } from '../../../../../lib/db';
 
 const MAX_PRODUCTS = 200;
@@ -29,19 +29,18 @@ function isValidImageMagicBytes(buf: Buffer): boolean {
 }
 
 export const POST: APIRoute = async ({ request, params }) => {
-  if (!isAuthenticated(request)) {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-      status: 401,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
-
   const { shopId } = params;
   if (!shopId) {
     return new Response(JSON.stringify({ error: 'Missing shopId' }), {
       status: 400,
       headers: { 'Content-Type': 'application/json' },
     });
+  }
+
+  try {
+    requireOwner(request, shopId);
+  } catch (err) {
+    return err as Response;
   }
 
   const shop = getShop(shopId);
@@ -66,6 +65,8 @@ export const POST: APIRoute = async ({ request, params }) => {
     const priceRaw = formData.get('price')?.toString() ?? '0';
     const address = formData.get('address')?.toString().trim() || null;
     const description = formData.get('description')?.toString().trim() || null;
+    // Convert decimal price (e.g. "9.99") to integer cents (999)
+    const priceCents = Math.round((parseFloat(priceRaw) || 0) * 100);
 
     if (!title) {
       return new Response(JSON.stringify({ error: 'Название обязательно' }), {
@@ -95,10 +96,8 @@ export const POST: APIRoute = async ({ request, params }) => {
       });
     }
 
-    const price = parseFloat(priceRaw) || 0;
-
     // Create product
-    const product = createProduct(shopId, title, price, description, address);
+    const product = createProduct(shopId, title, priceCents, description, address);
 
     // Handle image uploads
     const imageFiles = formData.getAll('images') as File[];

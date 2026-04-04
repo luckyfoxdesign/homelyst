@@ -30,7 +30,7 @@ test.describe('Products', () => {
       const body = await res.json();
       expect(body.success).toBe(true);
       expect(body.product.title).toBe('Test Item');
-      expect(body.product.price).toBe(25.50);
+      expect(body.product.price_cents).toBe(2550);
       expect(body.product.status).toBe('available');
     });
 
@@ -192,6 +192,43 @@ test.describe('Products', () => {
       expect(res.status()).toBe(409);
       const body = await res.json();
       expect(body.error).toContain('reserved');
+    });
+  });
+
+  test.describe('price_cents conversion', () => {
+    test('decimal price is stored as integer cents (9.99 → 999)', async () => {
+      const res = await apiCtx.post(`/api/shops/${shopId}/products`, {
+        multipart: { title: 'Price Edge Case', price: '9.99' },
+        headers: { cookie: `admin_token=${cookie}` },
+      });
+      expect(res.status()).toBe(200);
+      const body = await res.json();
+      // Must be 999, not 998 (ROUND before CAST prevents float truncation)
+      expect(body.product.price_cents).toBe(999);
+    });
+
+    test('zero price stores 0 cents', async () => {
+      const res = await apiCtx.post(`/api/shops/${shopId}/products`, {
+        multipart: { title: 'Free Item', price: '0' },
+        headers: { cookie: `admin_token=${cookie}` },
+      });
+      expect((await res.json()).product.price_cents).toBe(0);
+    });
+
+    test('whole number price stored correctly (100 → 10000)', async () => {
+      const res = await apiCtx.post(`/api/shops/${shopId}/products`, {
+        multipart: { title: 'Round Price', price: '100' },
+        headers: { cookie: `admin_token=${cookie}` },
+      });
+      expect((await res.json()).product.price_cents).toBe(10000);
+    });
+
+    test('omitted price defaults to 0 cents', async () => {
+      const res = await apiCtx.post(`/api/shops/${shopId}/products`, {
+        multipart: { title: 'No Price' },
+        headers: { cookie: `admin_token=${cookie}` },
+      });
+      expect((await res.json()).product.price_cents).toBe(0);
     });
   });
 

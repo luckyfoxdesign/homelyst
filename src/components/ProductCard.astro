@@ -9,7 +9,7 @@ export interface Props {
 const { product, shopId } = Astro.props;
 const { images } = product;
 
-const priceLabel = product.price === 0 ? 'Бесплатно' : `${product.price}€`;
+const priceLabel = product.price_cents === 0 ? 'Бесплатно' : `${(product.price_cents / 100).toFixed(2)}€`;
 
 let statusBadge = '';
 let statusClass = '';

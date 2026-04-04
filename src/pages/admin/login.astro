@@ -11,9 +11,19 @@ const redirect = Astro.url.searchParams.get('redirect') ?? '/admin';
       <h1 class="text-2xl font-bold text-gray-900 mb-2">Вход</h1>
       <p class="text-sm text-gray-500 mb-6">Панель администратора</p>
 
-      {error && (
+      {error === '1' && (
         <div class="mb-4 text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">
           Неверный пароль. Попробуйте ещё раз.
+        </div>
+      )}
+      {error === 'nouser' && (
+        <div class="mb-4 text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">
+          Пользователь-администратор не найден. Задайте <code>SEED_ADMIN_TELEGRAM_ID</code> или <code>SEED_ADMIN_EMAIL</code> при первом запуске.
+        </div>
+      )}
+      {error === 'forbidden' && (
+        <div class="mb-4 text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">
+          Доступ запрещён. Требуется роль администратора.
         </div>
       )}
 

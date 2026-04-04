@@ -1,26 +1,25 @@
 import type { APIRoute } from 'astro';
 import fs from 'node:fs';
 import path from 'node:path';
-import { isAuthenticated } from '../../../lib/auth';
+import { requireOwner } from '../../../lib/auth';
 import { getShop, deleteShop } from '../../../lib/db';
 import { audit } from '../../../lib/audit';
 
 const UPLOADS_BASE = process.env.UPLOADS_PATH ?? '/app/data/uploads';
 
 export const DELETE: APIRoute = async ({ request, params }) => {
-  if (!isAuthenticated(request)) {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-      status: 401,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
-
   const { shopId } = params;
   if (!shopId) {
     return new Response(JSON.stringify({ error: 'Missing shop ID' }), {
       status: 400,
       headers: { 'Content-Type': 'application/json' },
     });
+  }
+
+  try {
+    requireOwner(request, shopId);
+  } catch (err) {
+    return err as Response;
   }
 
   const shop = getShop(shopId);

@@ -1,5 +1,5 @@
 import type { APIRoute } from 'astro';
-import { isAuthenticated } from '../../../lib/auth';
+import { requireAdmin } from '../../../lib/auth';
 import { createShop, getShop, getShopCount } from '../../../lib/db';
 import { RESERVED_SLUGS } from '../../../lib/validate';
 import { audit } from '../../../lib/audit';
@@ -7,11 +7,11 @@ import { audit } from '../../../lib/audit';
 const MAX_SHOPS = 10;
 
 export const POST: APIRoute = async ({ request }) => {
-  if (!isAuthenticated(request)) {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-      status: 401,
-      headers: { 'Content-Type': 'application/json' },
-    });
+  let user;
+  try {
+    user = requireAdmin(request);
+  } catch (err) {
+    return err as Response;
   }
 
   try {
@@ -70,8 +70,8 @@ export const POST: APIRoute = async ({ request }) => {
       });
     }
 
-    const shop = createShop(id, name);
-    audit('shop_created', { shop_id: id });
+    const shop = createShop(id, name, user.id);
+    audit('shop_created', { shop_id: id, owner_id: user.id });
 
     return new Response(null, {
       status: 302,

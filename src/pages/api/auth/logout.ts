@@ -1,11 +1,8 @@
 import type { APIRoute } from 'astro';
-import { clearAuthCookie, invalidateToken, getTokenFromRequest } from '../../../lib/auth';
+import { clearAuthCookie, destroySession } from '../../../lib/auth';
 
 export const POST: APIRoute = async ({ request }) => {
-  const token = getTokenFromRequest(request);
-  if (token) {
-    invalidateToken(token);
-  }
+  destroySession(request);
 
   return new Response(null, {
     status: 302,

@@ -1,5 +1,5 @@
 import { defineMiddleware } from 'astro:middleware';
-import { isAuthenticated, getCsrfToken } from './lib/auth';
+import { getUserFromRequest, getCsrfToken } from './lib/auth';
 import { audit } from './lib/audit';
 
 // Strict headers for admin and all other routes
@@ -43,32 +43,53 @@ export const onRequest = defineMiddleware(async (context, next) => {
   const url = new URL(request.url);
   const pathname = url.pathname;
 
-  // Protect /admin/* routes except /admin/login
+  // ── /admin/* — requires authenticated user with role=admin ──────────────────
   if (pathname.startsWith('/admin') && pathname !== '/admin/login') {
-    if (!isAuthenticated(request)) {
+    const user = getUserFromRequest(request);
+    if (!user) {
       const redirectUrl = `/admin/login?redirect=${encodeURIComponent(pathname)}`;
       return context.redirect(redirectUrl);
     }
+    if (user.role !== 'admin') {
+      // Authenticated but not an admin — redirect to login (not a 403, to avoid leaking info)
+      return context.redirect('/admin/login?error=forbidden');
+    }
   }
 
-  // CSRF check for authenticated admin mutations via fetch/XHR (not form submissions)
-  // Skip public endpoints where admin cookie may be incidentally present
-  const isPublicEndpoint = pathname.endsWith('/reserve') || pathname === '/api/contact';
-  if (MUTATION_METHODS.has(request.method) && !isPublicEndpoint && isAuthenticated(request)) {
-    const contentType = request.headers.get('content-type') ?? '';
-    const isFormSubmission =
-      contentType.includes('multipart/form-data') ||
-      contentType.includes('application/x-www-form-urlencoded');
+  // ── /tma/owner/* — auth is handled per-request via TMA Bearer token,
+  //    not in middleware (so that API can return proper JSON errors)
+  // ── /api/tma/* — public endpoints (TMA auth happens inside the handler)
 
-    if (!isFormSubmission) {
-      const sessionCsrf = getCsrfToken(request);
-      const requestCsrf = request.headers.get('x-csrf-token');
-      if (!sessionCsrf || sessionCsrf !== requestCsrf) {
-        audit('csrf_mismatch', { path: pathname, method: request.method });
-        return new Response(JSON.stringify({ error: 'CSRF token mismatch' }), {
-          status: 403,
-          headers: { 'Content-Type': 'application/json' },
-        });
+  // ── CSRF check for authenticated mutations via fetch/XHR ────────────────────
+  // Skip public endpoints where admin cookie may be incidentally present
+  const isPublicEndpoint =
+    pathname.endsWith('/reserve') ||
+    pathname === '/api/contact' ||
+    pathname.startsWith('/api/tma/');
+
+  if (MUTATION_METHODS.has(request.method) && !isPublicEndpoint) {
+    const user = getUserFromRequest(request);
+    if (user) {
+      const contentType = request.headers.get('content-type') ?? '';
+      const isFormSubmission =
+        contentType.includes('multipart/form-data') ||
+        contentType.includes('application/x-www-form-urlencoded');
+
+      // Bearer-authenticated requests (TMA) are inherently CSRF-safe
+      // (browsers can't send custom headers cross-origin without CORS preflight)
+      const isBearerAuth =
+        (request.headers.get('authorization') ?? '').startsWith('Bearer ');
+
+      if (!isFormSubmission && !isBearerAuth) {
+        const sessionCsrf = getCsrfToken(request);
+        const requestCsrf = request.headers.get('x-csrf-token');
+        if (!sessionCsrf || sessionCsrf !== requestCsrf) {
+          audit('csrf_mismatch', { path: pathname, method: request.method });
+          return new Response(JSON.stringify({ error: 'CSRF token mismatch' }), {
+            status: 403,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
       }
     }
   }

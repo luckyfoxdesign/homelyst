@@ -167,7 +167,7 @@ const csrfToken = getCsrfToken(Astro.request) ?? '';
               <div class="flex-1 min-w-0">
                 <p class="font-medium text-gray-900 truncate">{product.title}</p>
                 <p class="text-sm text-gray-500">
-                  {product.price === 0 ? 'Бесплатно' : `${product.price}€`}
+                  {product.price_cents === 0 ? 'Бесплатно' : `${(product.price_cents / 100).toFixed(2)}€`}
                   {product.address ? ` · ${product.address}` : ''}
                 </p>
                 <div class="mt-1">

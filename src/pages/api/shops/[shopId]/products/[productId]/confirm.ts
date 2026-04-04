@@ -1,21 +1,20 @@
 import type { APIRoute } from 'astro';
-import { isAuthenticated } from '../../../../../../lib/auth';
+import { requireOwner } from '../../../../../../lib/auth';
 import { getProduct, confirmReservation } from '../../../../../../lib/db';
 
 export const POST: APIRoute = async ({ request, params }) => {
-  if (!isAuthenticated(request)) {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-      status: 401,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
-
   const { shopId, productId } = params;
   if (!shopId || !productId) {
     return new Response(JSON.stringify({ error: 'Missing parameters' }), {
       status: 400,
       headers: { 'Content-Type': 'application/json' },
     });
+  }
+
+  try {
+    requireOwner(request, shopId);
+  } catch (err) {
+    return err as Response;
   }
 
   const product = getProduct(parseInt(productId, 10));

@@ -1,27 +1,30 @@
-import { randomBytes } from 'node:crypto';
-import { createSession, getSession, deleteSession, cleanExpiredSessions } from './db';
+import {
+  createUserSession,
+  getUserSessionByTokenHash,
+  getUserById,
+  getShop,
+  deleteUserSession,
+  deleteAllUserSessions,
+  hashToken,
+  type User,
+  type UserSession,
+} from './db';
 import { audit } from './audit';
 
-if (!process.env.ADMIN_PASSWORD_HASH) {
-  if (!process.env.ADMIN_PASSWORD || process.env.ADMIN_PASSWORD === 'changeme') {
-    console.warn('[WARNING] ADMIN_PASSWORD is not set or uses the insecure default "changeme". Set a strong password in your .env file.');
+export type { User, UserSession };
+
+// ─── Token extraction ───────────────────────────────────────────────────────────
+
+/** Extract raw session token from cookie or Authorization: Bearer header. */
+export function getRawTokenFromRequest(request: Request): string | null {
+  // 1. Authorization: Bearer <token>
+  const authHeader = request.headers.get('authorization') ?? '';
+  if (authHeader.startsWith('Bearer ')) {
+    const token = authHeader.slice(7).trim();
+    if (token) return token;
   }
-  console.warn('[WARNING] ADMIN_PASSWORD_HASH is not set. Using plain-text password comparison. Run "node scripts/hash-password.js <password>" to generate a hash.');
-}
 
-export function createToken(ip: string): string {
-  const token = randomBytes(32).toString('hex');
-  const csrfToken = randomBytes(32).toString('hex');
-  cleanExpiredSessions();
-  createSession(token, csrfToken, ip);
-  return token;
-}
-
-export function invalidateToken(token: string): void {
-  deleteSession(token);
-}
-
-export function getTokenFromRequest(request: Request): string | null {
+  // 2. Cookie: admin_token=<token>
   const cookieHeader = request.headers.get('cookie') ?? '';
   const cookies = cookieHeader.split(';').reduce<Record<string, string>>((acc, part) => {
     const [key, ...rest] = part.trim().split('=');
@@ -31,35 +34,138 @@ export function getTokenFromRequest(request: Request): string | null {
   return cookies['admin_token'] ?? null;
 }
 
-export function isAuthenticated(request: Request): boolean {
-  const token = getTokenFromRequest(request);
-  if (!token) return false;
+// ─── Session lifecycle ──────────────────────────────────────────────────────────
 
-  const session = getSession(token);
-  if (!session) return false;
-
-  // Soft IP check — log mismatch but don't block (users behind NAT/VPN may change IP)
-  const currentIp = request.headers.get('x-real-ip') ??
-    (process.env.TRUST_LOCAL === 'true' ? '127.0.0.1' : 'unknown');
-  if (session.ip && session.ip !== currentIp) {
-    audit('session_ip_mismatch', { stored_ip: session.ip, current_ip: currentIp });
-  }
-
-  return true;
+/** Create a session for userId and return raw token + csrf token. */
+export function createSession(
+  userId: string,
+  ip: string | null,
+  ttlSeconds?: number
+): { rawToken: string; csrfToken: string } {
+  return createUserSession(userId, ip, ttlSeconds);
 }
 
+/** Destroy the session corresponding to the raw token in the request cookie/header. */
+export function destroySession(request: Request): void {
+  const raw = getRawTokenFromRequest(request);
+  if (!raw) return;
+  deleteUserSession(hashToken(raw));
+}
+
+/** Destroy all sessions for a user (logout everywhere). */
+export { deleteAllUserSessions as destroyAllSessions };
+
+// ─── Auth helpers ───────────────────────────────────────────────────────────────
+
+/**
+ * Returns the authenticated User for the request, or null.
+ * Cleans up expired sessions for the user as a side-effect.
+ */
+export function getUserFromRequest(request: Request): User | null {
+  const raw = getRawTokenFromRequest(request);
+  if (!raw) return null;
+
+  const tokenHash = hashToken(raw);
+  const session = getUserSessionByTokenHash(tokenHash);
+  if (!session) return null;
+
+  const user = getUserById(session.user_id);
+  if (!user) return null;
+
+  // Soft IP check — log mismatch but don't block
+  const currentIp =
+    request.headers.get('x-real-ip') ??
+    (process.env.TRUST_LOCAL === 'true' ? '127.0.0.1' : 'unknown');
+  if (session.created_ip && session.created_ip !== currentIp) {
+    audit('session_ip_mismatch', { user_id: user.id, stored_ip: session.created_ip, current_ip: currentIp });
+  }
+
+  return user;
+}
+
+/** Returns User or throws a 401 Response. */
+export function requireUser(request: Request): User {
+  const user = getUserFromRequest(request);
+  if (!user) {
+    throw new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  return user;
+}
+
+/** Returns User (role=admin) or throws 401/403 Response. */
+export function requireAdmin(request: Request): User {
+  const user = requireUser(request);
+  if (user.role !== 'admin') {
+    throw new Response(JSON.stringify({ error: 'Forbidden' }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  return user;
+}
+
+/**
+ * Returns User if they own the shop or are admin.
+ * Throws 401/403/404 Response otherwise.
+ */
+export function requireOwner(request: Request, shopId: string): User {
+  const user = requireUser(request);
+  if (user.role === 'admin') return user;
+
+  const shop = getShop(shopId);
+  if (!shop) {
+    throw new Response(JSON.stringify({ error: 'Shop not found' }), {
+      status: 404,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  if (shop.owner_id !== user.id) {
+    throw new Response(JSON.stringify({ error: 'Forbidden' }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  return user;
+}
+
+// ─── CSRF ───────────────────────────────────────────────────────────────────────
+
+/** Returns the CSRF token for the current session, or null. */
 export function getCsrfToken(request: Request): string | null {
-  const token = getTokenFromRequest(request);
-  if (!token) return null;
-  const session = getSession(token);
+  const raw = getRawTokenFromRequest(request);
+  if (!raw) return null;
+  const session = getUserSessionByTokenHash(hashToken(raw));
   return session?.csrf_token ?? null;
 }
 
-export function setAuthCookie(token: string): string {
+// ─── Cookie helpers ─────────────────────────────────────────────────────────────
+
+export function setAuthCookie(rawToken: string): string {
   const secure = process.env.TRUST_LOCAL !== 'true' ? '; Secure' : '';
-  return `admin_token=${token}; HttpOnly${secure}; SameSite=Lax; Path=/; Max-Age=86400`;
+  // 7-day sliding window matches createUserSession default TTL
+  return `admin_token=${rawToken}; HttpOnly${secure}; SameSite=Lax; Path=/; Max-Age=604800`;
 }
 
 export function clearAuthCookie(): string {
   return `admin_token=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0`;
+}
+
+// ─── Back-compat shims (used by existing code during migration) ─────────────────
+
+/** @deprecated Use getUserFromRequest instead. */
+export function isAuthenticated(request: Request): boolean {
+  return getUserFromRequest(request) !== null;
+}
+
+/** @deprecated Use getRawTokenFromRequest instead. */
+export function getTokenFromRequest(request: Request): string | null {
+  return getRawTokenFromRequest(request);
+}
+
+/** @deprecated Use destroySession instead. */
+export function invalidateToken(rawToken: string): void {
+  deleteUserSession(hashToken(rawToken));
 }

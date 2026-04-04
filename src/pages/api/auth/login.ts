@@ -1,9 +1,21 @@
 import type { APIRoute } from 'astro';
-import { createToken, setAuthCookie } from '../../../lib/auth';
+import { createSession, setAuthCookie } from '../../../lib/auth';
+import { getFirstAdmin, db, generateId } from '../../../lib/db';
 import { checkLoginLimit, resetLoginLimit, getClientIp } from '../../../lib/rateLimit';
 import { verifyPassword, safeEqual } from '../../../lib/password';
 import { safeRedirect } from '../../../lib/validate';
 import { audit } from '../../../lib/audit';
+
+/** Ensure an admin user exists; create one if the table is empty (password-bootstrap). */
+function ensureAdminUser(): import('../../../lib/db').User {
+  const existing = getFirstAdmin();
+  if (existing) return existing;
+
+  const id = generateId();
+  db.prepare('INSERT INTO users (id, role) VALUES (?, ?)').run(id, 'admin');
+  audit('admin_auto_bootstrapped', { id });
+  return getFirstAdmin()!;
+}
 
 export const POST: APIRoute = async ({ request }) => {
   const ip = getClientIp(request);
@@ -39,12 +51,14 @@ export const POST: APIRoute = async ({ request }) => {
     });
   }
 
-  // Successful login — reset rate limit counter
-  audit('login_success', { ip });
+  // Look up (or auto-create) the admin user to link the session
+  const adminUser = ensureAdminUser();
+
+  audit('login_success', { ip, user_id: adminUser.id });
   resetLoginLimit(ip);
 
-  const token = createToken(ip);
-  const cookieValue = setAuthCookie(token);
+  const { rawToken } = createSession(adminUser.id, ip);
+  const cookieValue = setAuthCookie(rawToken);
 
   return new Response(null, {
     status: 302,
