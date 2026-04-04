@@ -7,7 +7,7 @@ import { getShop, createProduct, addProductImage } from '../../../../../lib/db';
 const UPLOADS_BASE = process.env.UPLOADS_PATH ?? '/app/data/uploads';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
-const MAX_IMAGES = 10;
+const MAX_IMAGES = 1;
 const ALLOWED_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif']);
 
 function isValidImageMagicBytes(buf: Buffer): boolean {
