@@ -44,6 +44,11 @@ db.exec(`
     sort_order INTEGER DEFAULT 0,
     FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
   );
+
+  CREATE TABLE IF NOT EXISTS sessions (
+    token TEXT PRIMARY KEY,
+    created_at INTEGER DEFAULT (unixepoch())
+  );
 `);
 
 export interface Shop {
@@ -172,4 +177,23 @@ export function releaseReservation(productId: number): void {
   db.prepare(
     "UPDATE products SET status = 'available', reserved_by = NULL, reserved_at = NULL, confirmed = 0 WHERE id = ?"
   ).run(productId);
+}
+
+export function createSession(token: string): void {
+  db.prepare('INSERT INTO sessions (token) VALUES (?)').run(token);
+}
+
+export function hasSession(token: string): boolean {
+  const row = db
+    .prepare('SELECT 1 FROM sessions WHERE token = ? AND created_at + 86400 > unixepoch()')
+    .get(token);
+  return row !== null && row !== undefined;
+}
+
+export function deleteSession(token: string): void {
+  db.prepare('DELETE FROM sessions WHERE token = ?').run(token);
+}
+
+export function cleanExpiredSessions(): void {
+  db.prepare('DELETE FROM sessions WHERE created_at + 86400 <= unixepoch()').run();
 }

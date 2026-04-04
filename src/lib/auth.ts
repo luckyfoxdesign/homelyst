@@ -1,19 +1,19 @@
 import { randomBytes } from 'node:crypto';
+import { createSession, hasSession, deleteSession, cleanExpiredSessions } from './db';
 
 if (!process.env.ADMIN_PASSWORD || process.env.ADMIN_PASSWORD === 'changeme') {
   console.warn('[WARNING] ADMIN_PASSWORD is not set or uses the insecure default "changeme". Set a strong password in your .env file.');
 }
 
-const activeSessions = new Set<string>();
-
 export function createToken(): string {
   const token = randomBytes(32).toString('hex');
-  activeSessions.add(token);
+  cleanExpiredSessions();
+  createSession(token);
   return token;
 }
 
 export function invalidateToken(token: string): void {
-  activeSessions.delete(token);
+  deleteSession(token);
 }
 
 export function isAuthenticated(request: Request): boolean {
@@ -27,7 +27,7 @@ export function isAuthenticated(request: Request): boolean {
   const token = cookies['admin_token'];
   if (!token) return false;
 
-  return activeSessions.has(token);
+  return hasSession(token);
 }
 
 export function getTokenFromRequest(request: Request): string | null {
