@@ -10,7 +10,7 @@ const STRICT_HEADERS: Record<string, string> = {
   // unsafe-inline required for Astro inline scripts and Tailwind utility classes
   'Content-Security-Policy': [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-inline'",
+    "script-src 'self' 'unsafe-inline' https://telegram.org",
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob:",
     "font-src 'self'",
