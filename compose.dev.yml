@@ -7,5 +7,6 @@ services:
       - db_data:/app/data
       - ./src:/app/src
       - ./public:/app/public
+      - ./scripts:/app/scripts
       - ./astro.config.mjs:/app/astro.config.mjs
       - ./tailwind.config.mjs:/app/tailwind.config.mjs

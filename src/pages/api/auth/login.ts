@@ -1,6 +1,7 @@
 import type { APIRoute } from 'astro';
 import { createToken, setAuthCookie } from '../../../lib/auth';
 import { checkLoginLimit, resetLoginLimit, getClientIp } from '../../../lib/rateLimit';
+import { verifyPassword, safeEqual } from '../../../lib/password';
 
 export const POST: APIRoute = async ({ request }) => {
   const ip = getClientIp(request);
@@ -22,9 +23,15 @@ export const POST: APIRoute = async ({ request }) => {
       ? rawRedirect
       : '/admin';
 
+  // Prefer ADMIN_PASSWORD_HASH (scrypt); fall back to plain ADMIN_PASSWORD with timing-safe compare
+  const passwordHash = process.env.ADMIN_PASSWORD_HASH;
   const adminPassword = process.env.ADMIN_PASSWORD ?? 'changeme';
 
-  if (password !== adminPassword) {
+  const valid = passwordHash
+    ? await verifyPassword(password, passwordHash)
+    : safeEqual(password, adminPassword);
+
+  if (!valid) {
     return new Response(null, {
       status: 302,
       headers: {

@@ -1,8 +1,11 @@
 import { randomBytes } from 'node:crypto';
 import { createSession, hasSession, deleteSession, cleanExpiredSessions } from './db';
 
-if (!process.env.ADMIN_PASSWORD || process.env.ADMIN_PASSWORD === 'changeme') {
-  console.warn('[WARNING] ADMIN_PASSWORD is not set or uses the insecure default "changeme". Set a strong password in your .env file.');
+if (!process.env.ADMIN_PASSWORD_HASH) {
+  if (!process.env.ADMIN_PASSWORD || process.env.ADMIN_PASSWORD === 'changeme') {
+    console.warn('[WARNING] ADMIN_PASSWORD is not set or uses the insecure default "changeme". Set a strong password in your .env file.');
+  }
+  console.warn('[WARNING] ADMIN_PASSWORD_HASH is not set. Using plain-text password comparison. Run "node scripts/hash-password.js <password>" to generate a hash.');
 }
 
 export function createToken(): string {
@@ -41,7 +44,7 @@ export function getTokenFromRequest(request: Request): string | null {
 }
 
 export function setAuthCookie(token: string): string {
-  return `admin_token=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=86400`;
+  return `admin_token=${token}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=86400`;
 }
 
 export function clearAuthCookie(): string {
